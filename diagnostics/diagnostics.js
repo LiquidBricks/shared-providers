@@ -1,4 +1,3 @@
-import { Codes } from './codes.js';
 // diagnostics.js
 export function diagnostics({
   logger = console,
@@ -135,5 +134,3 @@ function makeRateLimiter({ bucketMs = 1000, burst = 10 } = {}) {
 }
 
 const onceCache = new Map();
-export { Codes };
-export * as metricsProviders from './metrics/index.js'

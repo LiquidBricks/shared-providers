@@ -1,2 +1,4 @@
-export * as diagnostics from './diagnostics/index.js';
-export * as nats from './natsContext.js';
+// Intentionally minimal root entry to keep side-effect free.
+// Prefer subpath imports for best tree-shaking.
+export {};
+
