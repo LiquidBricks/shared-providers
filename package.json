@@ -8,6 +8,7 @@
     ".": "./index.js",
     "./nats-context": "./natsContext.js",
     "./diagnostics": "./diagnostics/diagnostics.js",
+    "./diagnostics/codes": "./diagnostics/codes.js",
     "./diagnostics/metrics/nats": "./diagnostics/metrics/nats.js",
     "./diagnostics/metrics/console": "./diagnostics/metrics/console.js"
   },
