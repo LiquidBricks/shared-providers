@@ -1,0 +1,16 @@
+{
+  "name": "shared-providers",
+  "version": "1.0.0",
+  "description": "Shared diagnostics and NATS context utilities",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@nats-io/jetstream": "^3.0.2",
+    "@nats-io/kv": "^3.0.2",
+    "@nats-io/transport-node": "^3.0.2"
+  },
+  "license": "ISC"
+}
