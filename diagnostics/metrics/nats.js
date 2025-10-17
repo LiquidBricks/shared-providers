@@ -9,17 +9,12 @@
 //   metrics.count('ERR_DB_CONNECT', 1, { host: 'db' })
 //   metrics.timing('startup', 123, { pid: process.pid })
 
-const encoder = new TextEncoder();
 
 export function createNatsMetrics({ natsContext, subjectRoot = 'metrics' } = {}) {
-  if (!natsContext || typeof natsContext.publish !== 'function') {
-    throw new Error('createNatsMetrics requires a natsContext with publish(subject, Uint8Array)');
-  }
 
   const publishJson = async (subject, obj) => {
     try {
-      const data = encoder.encode(JSON.stringify(obj));
-      await natsContext.publish(subject, data);
+      await natsContext.publish(subject, JSON.stringify(obj));
     } catch {
       // intentionally ignore metrics publish failures
     }

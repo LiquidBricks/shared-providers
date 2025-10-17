@@ -7,14 +7,14 @@
   "exports": {
     ".": "./index.js",
     "./nats-context": "./natsContext.js",
+    "./create-subject": "./subjectFactory/index.js",
     "./diagnostics": "./diagnostics/diagnostics.js",
-    "./diagnostics/codes": "./diagnostics/codes.js",
     "./diagnostics/metrics/nats": "./diagnostics/metrics/nats.js",
     "./diagnostics/metrics/console": "./diagnostics/metrics/console.js"
   },
   "sideEffects": false,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/run.js"
   },
   "dependencies": {
     "@nats-io/jetstream": "^3.0.2",
