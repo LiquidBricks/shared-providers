@@ -5,7 +5,6 @@
   "main": "./index.js",
   "type": "module",
   "exports": {
-    ".": "./index.js",
     "./nats-context": "./natsContext.js",
     "./subject": "./subjectFactory/index.js",
     "./subject/create": "./subjectFactory/create.js",
