@@ -1,5 +1,6 @@
-import { Codes } from './codes.js';
 // diagnostics.js
+import { NO_CODE } from '../codes.js'
+
 export function diagnostics({
   logger = console,
   metrics = null,                     // { count(code,n,meta), timing(name,ms,meta) }
@@ -121,7 +122,7 @@ export function diagnostics({
 // simple token-bucket-ish per (code,level)
 function makeRateLimiter({ bucketMs = 1000, burst = 10 } = {}) {
   const buckets = new Map(); // key -> { ts,count }
-  return (code = 'NO_CODE', level = 'info') => {
+  return (code = NO_CODE, level = 'info') => {
     const key = `${level}:${code}`;
     const now = Date.now();
     const b = buckets.get(key);
@@ -135,5 +136,3 @@ function makeRateLimiter({ bucketMs = 1000, burst = 10 } = {}) {
 }
 
 const onceCache = new Map();
-export { Codes };
-export * as metricsProviders from './metrics/index.js'
