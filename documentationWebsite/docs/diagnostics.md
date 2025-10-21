@@ -109,4 +109,10 @@ scoped.info('scoped context');
 // Using NATS-backed metrics
 const d2 = diagnostics({ logger, metrics: natsMetrics, context: () => ({ service: 'users' }) });
 d2.info('published timing/count to NATS');
+
+// Custom NATS metrics subjects
+const natsMetricsCustom = createNatsMetrics({
+  natsContext: ncx,
+  subject: (kind) => `svc.metrics.${kind}` // 'count' | 'timing'
+});
 ```

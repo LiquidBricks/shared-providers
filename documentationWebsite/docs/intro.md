@@ -70,3 +70,18 @@ console.log('\nExplain', r.explain('user.created'));
 
 await ncx.close();
 ```
+
+## Custom Metrics Subjects
+
+When publishing metrics over NATS, you can customize the subject fully by supplying a function that receives the kind of metric ('count' or 'timing') and returns the fully-qualified subject string.
+
+```js
+import { createNatsMetrics } from '@liquid-bricks/shared-providers/diagnostics/metrics/nats';
+
+const d = diagnostics({
+  metrics: createNatsMetrics({
+    natsContext: ncx,
+    subject: (kind) => `my.app.metrics.${kind}`,
+  })
+});
+```

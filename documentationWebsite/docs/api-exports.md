@@ -60,4 +60,12 @@ const r = router({ tokens: ['entity','action'] });
 const d = diagnostics({ metrics: createConsoleMetrics() });
 r.route({ entity: 'user', action: 'created' }, { handler: () => d.info('ok') });
 await r.request({ subject: 'user.created' });
+
+// NATS metrics with custom subject function
+const dNats = diagnostics({
+  metrics: createNatsMetrics({
+    natsContext: ncx,
+    subject: (kind) => `svc.metrics.${kind}`
+  })
+})
 ```

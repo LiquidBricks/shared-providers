@@ -1,41 +1,52 @@
 // NATS metrics adapter implementing { count, timing }
-// Publishes JSON payloads over JetStream via natsContext.publish
-// Default subjects:
-//   {subjectRoot}.count
-//   {subjectRoot}.timing
 // Usage:
 //   import { createNatsMetrics } from './metrics/nats.js'
 //   const metrics = createNatsMetrics({ natsContext, subjectRoot: 'metrics' })
 //   metrics.count('ERR_DB_CONNECT', 1, { host: 'db' })
 //   metrics.timing('startup', 123, { pid: process.pid })
+//
+// Custom subject function:
+//   const metrics = createNatsMetrics({
+//     natsContext,
+//     subject: (kind) => `my.app.metrics.${kind}` // kind is 'count' or 'timing'
+//   })
 
-
-export function createNatsMetrics({ natsContext, subjectRoot = 'metrics' } = {}) {
-
-  const publishJson = async (subject, obj) => {
+export function createNatsMetrics({
+  natsContext,
+  subjectRoot = 'metrics',
+  subject: subjectFor,
+  now = () => Date.now(),
+} = {}) {
+  // Resolve subject based on kind ('count' | 'timing')
+  const subject = (kind) => {
     try {
-      await natsContext.publish(subject, JSON.stringify(obj));
-    } catch {
-      // intentionally ignore metrics publish failures
-    }
-  };
+      if (typeof subjectFor === 'function') return subjectFor(kind)
+    } catch { /* ignore bad subject function */ }
+    return `${subjectRoot}.${kind}`
+  }
 
-  const base = () => ({ ts: Date.now() });
+  const safePublish = (subj, entry) => {
+    try {
+      const json = JSON.stringify(entry)
+      const p = natsContext?.publish?.(subj, json)
+      // Avoid unhandled rejections
+      if (p && typeof p.then === 'function') p.catch(() => {})
+    } catch { /* ignore sync publish errors */ }
+  }
 
   return {
     count(code, n = 1, meta) {
-      if (!code) return;
-      const subject = `${subjectRoot}.count`;
-      // Fire-and-forget; do not throw
-      publishJson(subject, { ...base(), type: 'count', code, n, meta });
+      if (!code) return // ignore invalid
+      const entry = { ts: now(), type: 'count', code, n, meta }
+      safePublish(subject('count'), entry)
     },
     timing(name, ms, meta) {
-      if (!name || typeof ms !== 'number') return;
-      const subject = `${subjectRoot}.timing`;
-      // Fire-and-forget; do not throw
-      publishJson(subject, { ...base(), type: 'timing', name, ms, meta });
+      if (!name || typeof ms !== 'number') return // ignore invalid
+      const entry = { ts: now(), type: 'timing', name, ms, meta }
+      safePublish(subject('timing'), entry)
     },
-  };
+  }
 }
 
-export default createNatsMetrics;
+export default createNatsMetrics
+

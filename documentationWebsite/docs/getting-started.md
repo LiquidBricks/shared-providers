@@ -79,4 +79,13 @@ const dConsole = diagnostics({ metrics: createConsoleMetrics({ prefix: 'app' }) 
 const dNats = diagnostics({ metrics: createNatsMetrics({ natsContext: ncx }) });
 dConsole.info('hello');
 dNats.warn(false, 'DEMO_WARN', 'something to notice');
+
+// Custom metrics subject function (optional)
+const dNatsCustom = diagnostics({
+  metrics: createNatsMetrics({
+    natsContext: ncx,
+    subject: (kind) => `my.app.metrics.${kind}` // kind: 'count' | 'timing'
+  })
+})
+dNatsCustom.info('using custom metrics subjects')
 ```
