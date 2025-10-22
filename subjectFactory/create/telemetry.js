@@ -19,7 +19,7 @@ const ENTITIES = {
   trace: ['span'],
 }
 
-export function createTelemetry(init = {}) {
+export function create(init = {}) {
   const state = Object.create(null)
 
   // Optional initialization from a subject string, e.g. tele.metric.counter.v1
@@ -151,4 +151,3 @@ export function createTelemetry(init = {}) {
 
   return api
 }
-

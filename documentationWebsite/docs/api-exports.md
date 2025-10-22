@@ -24,7 +24,7 @@ Example imports:
 
 ```js
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
-import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
+import { telemetry, router } from '@liquid-bricks/shared-providers/subject';
 import { SUBJECT_TOKEN_COUNT } from '@liquid-bricks/shared-providers/codes';
 ```
 
@@ -39,11 +39,11 @@ import '@liquid-bricks/shared-providers';
 // NATS context
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
 
-// Subject factory (index exports both create and router)
-import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
-// Direct subpaths
-import { create as createSubjectDirect } from '@liquid-bricks/shared-providers/subject/create/basic';
-import { router as routerDirect } from '@liquid-bricks/shared-providers/subject/router';
+// Subject factory barrel: namespaced builders + router
+import { telemetry, basic, router } from '@liquid-bricks/shared-providers/subject';
+// Direct subpaths for specific builders
+import { create as createBasic } from '@liquid-bricks/shared-providers/subject/create/basic';
+import { create as createTelemetry } from '@liquid-bricks/shared-providers/subject/create/telemetry';
 
 // Diagnostics and metrics adapters
 import diagnostics from '@liquid-bricks/shared-providers/diagnostics';
@@ -55,7 +55,8 @@ import * as CODES from '@liquid-bricks/shared-providers/codes';
 
 // Quick sanity use
 const ncx = createNatsContext({ servers: 'nats://localhost:4222' });
-const subj = createSubject().entity('user').action('created').toString();
+const tele = telemetry.create().log().version('v1').toString();
+const subj = basic.create().entity('user').action('created').toString();
 const r = router({ tokens: ['entity','action'] });
 const d = diagnostics({ metrics: createConsoleMetrics() });
 r.route({ entity: 'user', action: 'created' }, { handler: () => d.info('ok') });

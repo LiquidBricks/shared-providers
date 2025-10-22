@@ -22,7 +22,7 @@ End-to-end usage showing how the pieces fit together: diagnostics, NATS context,
 ```js
 // Imports
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
-import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
+import { telemetry, basic, router } from '@liquid-bricks/shared-providers/subject';
 import diagnostics from '@liquid-bricks/shared-providers/diagnostics';
 import { createNatsMetrics } from '@liquid-bricks/shared-providers/diagnostics/metrics/nats';
 
@@ -35,8 +35,8 @@ const d = diagnostics({
   metrics: createNatsMetrics({ natsContext: ncx, subjectRoot: 'metrics.shared' }),
 });
 
-// Subject builder for a 9-part subject
-const subj = createSubject()
+// Subject builder for a 9-part subject (basic)
+const subj = basic.create()
   .env('dev').ns('core').tenant('t1').context('_')
   .channel('events').entity('user').action('created')
   .version('v1').id('123');

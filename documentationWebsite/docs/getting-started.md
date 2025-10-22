@@ -14,14 +14,15 @@ Basic usage example:
 ```js
 // ESM imports
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
-import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
+import { telemetry, basic, router } from '@liquid-bricks/shared-providers/subject';
 import codes from '@liquid-bricks/shared-providers/codes';
 import diagnostics from '@liquid-bricks/shared-providers/diagnostics';
 
 // Create or inject a NATS connection first, then:
 const ncx = await createNatsContext({ servers: 'nats://localhost:4222' });
 
-const subj = createSubject('users').withAction('created');
+// Basic 9-part subject builder via barrel or subpath
+const subj = basic.create({ context: 'users' }).action('created');
 await ncx.publish(subj.toString(), { id: '123', name: 'Ada' });
 
 diagnostics.info('User created event published', { subject: subj.toString() });
@@ -39,8 +40,7 @@ All common imports and subject-builder variations in one place.
 ```js
 // Subpath imports
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
-import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
-import { create as buildSubject } from '@liquid-bricks/shared-providers/subject/create/basic';
+import { telemetry, basic, router } from '@liquid-bricks/shared-providers/subject';
 import { router as makeRouter } from '@liquid-bricks/shared-providers/subject/router';
 import diagnostics from '@liquid-bricks/shared-providers/diagnostics';
 import { createConsoleMetrics } from '@liquid-bricks/shared-providers/diagnostics/metrics/console';
@@ -48,16 +48,16 @@ import { createNatsMetrics } from '@liquid-bricks/shared-providers/diagnostics/m
 import codes from '@liquid-bricks/shared-providers/codes';
 
 // Subject builder: from empty, from object, from string
-const s1 = createSubject()
+const s1 = basic.create()
   .env('dev').ns('core').tenant('t1').context('_')
   .channel('events').entity('user').action('created').version('v1').id('123')
   .toString();
 
-const s2 = createSubject({ env: 'prod', ns: 'core', entity: 'invoice', action: 'paid' })
+const s2 = basic.create({ env: 'prod', ns: 'core', entity: 'invoice', action: 'paid' })
   .version('v1').id('abc').toString();
 
 // From fully-qualified string (must be 9 tokens)
-const s3 = createSubject('dev.core.t1._.events.user.created.v1.123').toString();
+const s3 = basic.create('dev.core.t1._.events.user.created.v1.123').toString();
 
 // Multi-setter; unknown/override errors
 const sb = buildSubject().set({ env: 'dev', entity: 'user' });
