@@ -40,7 +40,7 @@ All common imports and subject-builder variations in one place.
 // Subpath imports
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
 import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
-import { createSubject as buildSubject } from '@liquid-bricks/shared-providers/subject/create';
+import { create as buildSubject } from '@liquid-bricks/shared-providers/subject/create/basic';
 import { router as makeRouter } from '@liquid-bricks/shared-providers/subject/router';
 import diagnostics from '@liquid-bricks/shared-providers/diagnostics';
 import { createConsoleMetrics } from '@liquid-bricks/shared-providers/diagnostics/metrics/console';

@@ -13,7 +13,7 @@ Subpath exports:
 
 - `@liquid-bricks/shared-providers/nats-context` → `natsContext.js`
 - `@liquid-bricks/shared-providers/subject` → `subjectFactory/index.js`
-- `@liquid-bricks/shared-providers/subject/create` → `subjectFactory/create.js`
+- `@liquid-bricks/shared-providers/subject/create/basic` → `subjectFactory/create/basic.js`
 - `@liquid-bricks/shared-providers/subject/router` → `subjectFactory/router.js`
 - `@liquid-bricks/shared-providers/codes` → `codes.js`
 - `@liquid-bricks/shared-providers/diagnostics` → `diagnostics/diagnostics.js`
@@ -42,7 +42,7 @@ import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
 // Subject factory (index exports both create and router)
 import { createSubject, router } from '@liquid-bricks/shared-providers/subject';
 // Direct subpaths
-import { createSubject as createSubjectDirect } from '@liquid-bricks/shared-providers/subject/create';
+import { create as createSubjectDirect } from '@liquid-bricks/shared-providers/subject/create/basic';
 import { router as routerDirect } from '@liquid-bricks/shared-providers/subject/router';
 
 // Diagnostics and metrics adapters

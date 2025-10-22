@@ -7,7 +7,8 @@
   "exports": {
     "./nats-context": "./natsContext.js",
     "./subject": "./subjectFactory/index.js",
-    "./subject/create": "./subjectFactory/create.js",
+    "./subject/create/basic": "./subjectFactory/create/basic.js",
+    "./subject/create/telemetry": "./subjectFactory/create/telemetry.js",
     "./subject/router": "./subjectFactory/router.js",
     "./codes": "./codes.js",
     "./diagnostics": "./diagnostics/diagnostics.js",

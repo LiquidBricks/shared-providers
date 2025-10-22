@@ -1,11 +1,11 @@
 // Subject builder: fluent API for 9-part subjects
 // Shape: <env>.<ns>.<tenant>.<context>.<channel>.<entity>.<action>.<version>.<id>
-import { SUBJECT_TOKEN_COUNT, SUBJECT_TOKEN_OVERRIDE, SUBJECT_TOKEN_UNKNOWN } from '../codes.js'
+import { SUBJECT_TOKEN_COUNT, SUBJECT_TOKEN_OVERRIDE, SUBJECT_TOKEN_UNKNOWN } from '../../codes.js'
 
 const isMissing = (v) => v === undefined || v === null || v === ''
 const norm = (v) => (isMissing(v) ? '_' : String(v))
 
-export function createSubject(init = {}) {
+export function create(init = {}) {
   const KEYS = ['env', 'ns', 'tenant', 'context', 'channel', 'entity', 'action', 'version', 'id']
   const state = Object.create(null)
 
@@ -76,4 +76,3 @@ export function createSubject(init = {}) {
   return api
 }
 
-export default createSubject

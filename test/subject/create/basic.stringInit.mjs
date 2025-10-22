@@ -1,14 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { createSubject } from '../subjectFactory/index.js'
+import { create } from '../../../subjectFactory/create/basic.js'
 
 // Fully qualified subject string order:
 // env.ns.tenant.context.channel.entity.action.version.id
 
 test('accepts fully qualified string init and populates tokens', () => {
   const fullyQualified = 'prod.components.acme.api.cmd.component.register.v1.42'
-  const s = createSubject(fullyQualified)
+  const s = create(fullyQualified)
 
   // Builds back to the same string
   assert.equal(s.build(), fullyQualified)
@@ -35,5 +35,6 @@ test('accepts fully qualified string init and populates tokens', () => {
 test('missing tokens in string init throws', () => {
   // Only 8 tokens (missing id)
   const missing = 'prod.components.acme.api.cmd.component.register.v1'
-  assert.throws(() => createSubject(missing))
+  assert.throws(() => create(missing))
 })
+

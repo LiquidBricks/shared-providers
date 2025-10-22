@@ -1,15 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { createSubject } from '../subjectFactory/index.js'
+import { create } from '../../../subjectFactory/create/basic.js'
 
 test('builds all underscores when empty', () => {
-  const subj = createSubject().build()
+  const subj = create().build()
   assert.equal(subj, '_._._._._._._._._')
 })
 
 test('order-agnostic partial application with defaults', () => {
-  const subj = createSubject()
+  const subj = create()
     .ns('component-service')
     .env('prod')
     .channel('cmd')
@@ -25,7 +25,7 @@ test('order-agnostic partial application with defaults', () => {
 })
 
 test('override throws; same value allowed', () => {
-  const s = createSubject({ env: 'prod' })
+  const s = create({ env: 'prod' })
   // Same value is a no-op
   assert.doesNotThrow(() => s.env('prod'))
   // Different value throws
@@ -33,7 +33,7 @@ test('override throws; same value allowed', () => {
 })
 
 test('multi-set works and respects override rules', () => {
-  const s = createSubject().set({ env: 'prod', ns: 'cs' })
+  const s = create().set({ env: 'prod', ns: 'cs' })
   assert.equal(s.build(), 'prod.cs._._._._._._._')
 
   // Setting same values is fine
@@ -43,18 +43,19 @@ test('multi-set works and respects override rules', () => {
 })
 
 test('parts() returns normalized tokens', () => {
-  const p = createSubject({ env: 'prod', ns: 'cs' }).parts()
+  const p = create({ env: 'prod', ns: 'cs' }).parts()
   assert.equal(Array.isArray(p), true)
   assert.equal(p.length, 9)
   assert.deepEqual(p, ['prod', 'cs', '_', '_', '_', '_', '_', '_', '_'])
 })
 
 test('unknown token in set throws', () => {
-  const s = createSubject()
+  const s = create()
   assert.throws(() => s.set({ foo: 'bar' }), (err) => err && err.code === 'SUBJECT_TOKEN_UNKNOWN')
 })
 
 test('toString matches build', () => {
-  const s = createSubject({ env: 'prod', ns: 'cs' })
+  const s = create({ env: 'prod', ns: 'cs' })
   assert.equal(String(s), s.build())
 })
+
