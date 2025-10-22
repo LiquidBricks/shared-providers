@@ -49,10 +49,11 @@ export function router(config = {}) {
 
     route(values = {}, routeConfig = {}) {
       // Internal helper to support pre/post aggregation across nested children
-      const defineRoute = (vals = {}, cfg = {}, aggPre = [], aggPost = [], aggOnPreErr = [], aggOnPostErr = [], aggOnHandlerErr = [], aggOnErr = []) => {
+      // activeTokens represents the ordered token names available along this subtree
+      const defineRoute = (vals = {}, cfg = {}, aggPre = [], aggPost = [], aggOnPreErr = [], aggOnPostErr = [], aggOnHandlerErr = [], aggOnErr = [], activeTokens = tokens.slice()) => {
         if (vals == null || typeof vals !== 'object') vals = {}
         for (const k of Object.keys(vals)) {
-          if (!tokens.includes(k)) {
+          if (!activeTokens.includes(k)) {
             const err = new Error(`Unknown token in route: ${k}`)
             err.code = ROUTER_TOKEN_UNKNOWN
             err.meta = { token: k }
@@ -62,8 +63,8 @@ export function router(config = {}) {
 
         // Descend to the node representing provided values
         let node = trie
-        for (let i = 0; i < tokens.length; i++) {
-          const t = tokens[i]
+        for (let i = 0; i < activeTokens.length; i++) {
+          const t = activeTokens[i]
           if (vals[t] === undefined) continue
           const v = String(vals[t])
           if (!node[t]) node[t] = {}
@@ -92,6 +93,23 @@ export function router(config = {}) {
         const nextOnHandlerErr = onHandlerErrorHooks.length > 0 ? onHandlerErrorHooks.concat(aggOnHandlerErr) : aggOnHandlerErr.slice()
         const nextOnErr = onErrorHooks.length > 0 ? onErrorHooks.concat(aggOnErr) : aggOnErr.slice()
 
+        // Extend token sequence at this node if cfg.tokens provided
+        let extendedTokens = activeTokens
+        if (Array.isArray(cfg?.tokens) && cfg.tokens.length > 0) {
+          const ext = cfg.tokens.filter(t => typeof t === 'string')
+          for (const t of ext) {
+            if (extendedTokens.includes(t)) {
+              const err = new Error(`Duplicate token in extension: ${t}`)
+              err.code = ROUTER_TOKEN_UNKNOWN
+              err.meta = { token: t }
+              throw err
+            }
+          }
+          if (!node.$tokensExt) node.$tokensExt = []
+          for (const t of ext) if (!node.$tokensExt.includes(t)) node.$tokensExt.push(t)
+          extendedTokens = extendedTokens.concat(ext)
+        }
+
         if (!hasChildren && !hasHandler) {
           const err = new Error('handler is required when no children are provided')
           err.code = ROUTER_ROUTE_HANDLER_REQUIRED
@@ -119,7 +137,7 @@ export function router(config = {}) {
 
             // Validate tokens in child
             for (const k of Object.keys(childValues)) {
-              if (!tokens.includes(k)) {
+              if (!extendedTokens.includes(k)) {
                 const err = new Error(`Unknown token in child route: ${k}`)
                 err.code = ROUTER_TOKEN_UNKNOWN
                 err.meta = { token: k }
@@ -139,7 +157,7 @@ export function router(config = {}) {
 
             // Combine values (parent precedence) and recurse with aggregated hooks
             const combinedValues = { ...childValues, ...vals }
-            defineRoute(combinedValues, childConfig, nextPre, nextPost, nextOnPreErr, nextOnPostErr, nextOnHandlerErr, nextOnErr)
+            defineRoute(combinedValues, childConfig, nextPre, nextPost, nextOnPreErr, nextOnPostErr, nextOnHandlerErr, nextOnErr, extendedTokens)
           }
         } else if (hasHandler) {
           node.$leaf = true
@@ -155,7 +173,7 @@ export function router(config = {}) {
         routes.push({ values: { ...vals }, config: cfg })
       }
 
-      defineRoute(values, routeConfig, [], [], [], [], [], [])
+      defineRoute(values, routeConfig, [], [], [], [], [], [], tokens.slice())
       return api
     },
 
@@ -245,18 +263,20 @@ export function router(config = {}) {
       }
       const parts = subject.split('.')
       const params = {}
-      // Map available parts to defined tokens; ignore extras, leave missing as undefined
-      const len = Math.min(tokens.length, parts.length)
+      const baseLen = tokens.length
+      // Map base tokens to parts; ignore extras for now (extensions will map them)
+      const len = Math.min(baseLen, parts.length)
       for (let i = 0; i < len; i++) params[tokens[i]] = parts[i]
-      for (let i = len; i < tokens.length; i++) params[tokens[i]] = undefined
+      for (let i = len; i < baseLen; i++) params[tokens[i]] = undefined
+      const extParts = parts.slice(baseLen)
       // Build execution-time info object (router-owned) and contexts
       const info = { subject, params, tokens: tokens.slice() }
       const ctx = routerContext
       const rootCtx = routerContext
 
-      // Depth-first search to find best matching leaf by score (# of tokens matched)
-      const best = { score: -1, handler: null, pre: [], post: [], onPreErr: [], onPostErr: [], onHandlerErr: [], onErr: [] }
-      const collectBest = (node, startIndex, matchedCount) => {
+      // Depth-first search across base+extension tokens to find best matching leaf
+      const best = { score: -1, handler: null, pre: [], post: [], onPreErr: [], onPostErr: [], onHandlerErr: [], onErr: [], paramsExt: {}, extSeq: [] }
+      const collectBest = (node, baseStartIndex, matchedCount, extSeq, extIdx, paramsExt) => {
         if (!node) return
         if (typeof node.$handler === 'function') {
           if (matchedCount > best.score) {
@@ -268,22 +288,62 @@ export function router(config = {}) {
             best.onPostErr = Array.isArray(node.$onPostError) ? node.$onPostError : []
             best.onHandlerErr = Array.isArray(node.$onHandlerError) ? node.$onHandlerError : []
             best.onErr = Array.isArray(node.$onError) ? node.$onError : []
+            best.paramsExt = paramsExt ? { ...paramsExt } : {}
+            // Capture full extension sequence at this node (including its own $tokensExt)
+            const seqHere = (Array.isArray(node.$tokensExt) && node.$tokensExt.length > 0)
+              ? (extSeq && extSeq.length > 0 ? extSeq.concat(node.$tokensExt) : node.$tokensExt.slice())
+              : (extSeq || [])
+            best.extSeq = seqHere
           }
         }
-        for (let i = startIndex; i < tokens.length; i++) {
+        // Try to match across remaining base tokens
+        for (let i = baseStartIndex; i < baseLen; i++) {
           const t = tokens[i]
           const bucket = node[t]
           if (!bucket) continue
           const val = String(params[t])
           if (Object.prototype.hasOwnProperty.call(bucket, val)) {
-            collectBest(bucket[val], i + 1, matchedCount + 1)
+            collectBest(bucket[val], i + 1, matchedCount + 1, extSeq, extIdx, paramsExt)
+          }
+        }
+        // After base tokens, walk dynamic extension tokens in order
+        if (baseStartIndex >= baseLen) {
+          const seq = Array.isArray(node.$tokensExt) && node.$tokensExt.length > 0
+            ? (extSeq && extSeq.length > 0 ? extSeq.concat(node.$tokensExt) : node.$tokensExt.slice())
+            : (extSeq || [])
+          if (seq.length > 0) {
+            const nextIdx = extIdx >>> 0
+            if (nextIdx < seq.length) {
+              const t = seq[nextIdx]
+              const v = extParts[nextIdx]
+              const bucket = node[t]
+              if (bucket && Object.prototype.hasOwnProperty.call(bucket, String(v))) {
+                const child = bucket[String(v)]
+                const nextParamsExt = { ...(paramsExt || {}) }
+                if (v !== undefined) nextParamsExt[t] = String(v)
+                collectBest(child, baseLen, matchedCount + 1, seq, nextIdx + 1, nextParamsExt)
+              }
+            }
           }
         }
       }
-      collectBest(trie, 0, 0)
+      collectBest(trie, 0, 0, [], 0, {})
 
       // Execute only the highest-scoring leaf if present
       if (typeof best.handler === 'function') {
+        // Merge extension tokens (if any) into info before executing pipeline
+        const extSeq = Array.isArray(best.extSeq) ? best.extSeq : []
+        if (extSeq.length > 0) {
+          // Extend tokens list with extension sequence
+          info.tokens = info.tokens.concat(extSeq)
+          // Map ext parts positionally; undefined when missing
+          for (let i = 0; i < extSeq.length; i++) {
+            const t = extSeq[i]
+            const v = extParts[i]
+            info.params[t] = v === undefined ? undefined : String(v)
+          }
+        }
+
         // Initialize shared scope for this pipeline execution
         const scope = {}
 
@@ -316,6 +376,9 @@ export function router(config = {}) {
           // nobody handled
           throw lastError
         }
+
+        // Merge extension params from best match into info.params
+        if (best.paramsExt && typeof best.paramsExt === 'object') Object.assign(params, best.paramsExt)
 
         // Run pre hooks in order (supports async)
         for (let i = 0; i < best.pre.length; i++) {
@@ -365,14 +428,16 @@ export function router(config = {}) {
       }
       const parts = subject.split('.')
       const params = {}
-      const len = Math.min(tokens.length, parts.length)
+      const baseLen = tokens.length
+      const len = Math.min(baseLen, parts.length)
       for (let i = 0; i < len; i++) params[tokens[i]] = parts[i]
       for (let i = len; i < tokens.length; i++) params[tokens[i]] = undefined
+      const extParts = parts.slice(baseLen)
 
       const matches = []
       const fnName = (fn) => (typeof fn === 'function' && fn.name ? fn.name : 'handler')
 
-      const traverse = (node, startIndex, matchedCount, matchedValues) => {
+      const traverse = (node, baseStartIndex, matchedCount, matchedValues, extSeq, extIdx) => {
         if (!node) return
         if (typeof node.$handler === 'function') {
           const pre = Array.isArray(node.$pre) ? node.$pre.slice() : []
@@ -389,17 +454,34 @@ export function router(config = {}) {
             kind: matchedCount === 0 ? 'default' : 'route',
           })
         }
-        for (let i = startIndex; i < tokens.length; i++) {
+        for (let i = baseStartIndex; i < tokens.length; i++) {
           const t = tokens[i]
           const bucket = node[t]
           if (!bucket) continue
           const val = String(params[t])
           if (Object.prototype.hasOwnProperty.call(bucket, val)) {
-            traverse(bucket[val], i + 1, matchedCount + 1, { ...matchedValues, [t]: val })
+            traverse(bucket[val], i + 1, matchedCount + 1, { ...matchedValues, [t]: val }, extSeq, extIdx)
+          }
+        }
+        if (baseStartIndex >= tokens.length) {
+          const seq = Array.isArray(node.$tokensExt) && node.$tokensExt.length > 0
+            ? (extSeq && extSeq.length > 0 ? extSeq.concat(node.$tokensExt) : node.$tokensExt.slice())
+            : (extSeq || [])
+          if (seq.length > 0) {
+            const nextIdx = (extIdx >>> 0)
+            if (nextIdx < seq.length) {
+              const t = seq[nextIdx]
+              const v = extParts[nextIdx]
+              const bucket = node[t]
+              if (bucket && Object.prototype.hasOwnProperty.call(bucket, String(v))) {
+                const child = bucket[String(v)]
+                traverse(child, tokens.length, matchedCount + 1, { ...matchedValues, [t]: String(v) }, seq, nextIdx + 1)
+              }
+            }
           }
         }
       }
-      traverse(trie, 0, 0, {})
+      traverse(trie, 0, 0, {}, [], 0)
 
       // Determine best and competing (lower-score only)
       let best = null
