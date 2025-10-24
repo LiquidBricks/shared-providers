@@ -30,23 +30,24 @@ export function createNatsMetrics({
       const json = JSON.stringify(entry)
       const p = natsContext?.publish?.(subj, json)
       // Avoid unhandled rejections
-      if (p && typeof p.then === 'function') p.catch(() => {})
+      if (p && typeof p.then === 'function') p.catch(() => { })
     } catch { /* ignore sync publish errors */ }
   }
 
+  const envelope = () => ({ ts: now(), kind: 'metric' })
+
   return {
-    count(code, n = 1, meta) {
+    count(code, n = 1, attributes) {
       if (!code) return // ignore invalid
-      const entry = { ts: now(), type: 'count', code, n, meta }
+      const entry = { ...envelope(), type: 'count', code, n, attributes }
       safePublish(subject('count'), entry)
     },
-    timing(name, ms, meta) {
+    timing(name, ms, attributes) {
       if (!name || typeof ms !== 'number') return // ignore invalid
-      const entry = { ts: now(), type: 'timing', name, ms, meta }
+      const entry = { ...envelope(), type: 'timing', name, ms, attributes }
       safePublish(subject('timing'), entry)
     },
   }
 }
 
 export default createNatsMetrics
-

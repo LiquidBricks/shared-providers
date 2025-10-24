@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 
-import { createNatsLogger } from '../diagnostics/loggers/nats.js'
+import { createNatsLogger } from '../../../diagnostics/loggers/nats.js'
 
 test('publishes log levels with default subjects', async () => {
   const calls = []
@@ -30,9 +30,11 @@ test('publishes log levels with default subjects', async () => {
   assert.equal(calls[3].subject, 'logs.debug')
 
   const e = JSON.parse(calls[0].json)
+  assert.equal(e.kind, 'log')
+  assert.equal(typeof e.ts, 'number')
   assert.equal(e.level, 'error')
-  assert.equal(e.msg, 'm')
-  assert.deepEqual(e.meta, { a: 1 })
+  assert.equal(e.attributes.msg, 'm')
+  assert.deepEqual(e.attributes.meta, { a: 1 })
 })
 
 test('uses custom subject function for log levels', async () => {
@@ -85,4 +87,3 @@ test('swallows publish errors without unhandled rejection', async () => {
   assert.equal(attempts.length, 2)
   assert.equal(unhandled, null)
 })
-

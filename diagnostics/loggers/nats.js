@@ -20,6 +20,7 @@ export function createNatsLogger({
   natsContext,
   subjectRoot = 'logs',
   subject: subjectFor,
+  now = () => Date.now(),
 } = {}) {
   // Resolve subject based on level ('error' | 'warn' | 'info' | 'debug')
   const subject = (level) => {
@@ -29,27 +30,29 @@ export function createNatsLogger({
     return `${subjectRoot}.${level}`
   }
 
-  const safePublish = (subj, entry) => {
+  const safePublish = (subj, payload) => {
     try {
-      const json = JSON.stringify(entry)
+      const json = JSON.stringify(payload)
       const p = natsContext?.publish?.(subj, json)
       // Avoid unhandled rejections
-      if (p && typeof p.then === 'function') p.catch(() => {})
+      if (p && typeof p.then === 'function') p.catch(() => { })
     } catch { /* ignore sync publish errors */ }
   }
 
-  const publish = (level, entry) => {
-    if (!entry) return
-    safePublish(subject(level), entry)
+  const envelope = () => ({ ts: now(), kind: 'log' })
+  const publish = (level, attributes) => {
+    if (!attributes) return
+    // Always include the log level; nest attributes as attributes
+    const payload = { ...envelope(), level, attributes }
+    safePublish(subject(level), payload)
   }
 
   return {
-    error(entry) { publish('error', entry) },
-    warn(entry) { publish('warn', entry) },
-    info(entry) { publish('info', entry) },
-    debug(entry) { publish('debug', entry) },
+    error(attributes) { publish('error', attributes) },
+    warn(attributes) { publish('warn', attributes) },
+    info(attributes) { publish('info', attributes) },
+    debug(attributes) { publish('debug', attributes) },
   }
 }
 
 export default createNatsLogger
-

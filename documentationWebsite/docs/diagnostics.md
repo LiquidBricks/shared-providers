@@ -63,7 +63,7 @@ const sample = (code, level) => (level === 'debug' ? false : true);
 const redact = (m) => ({ ...m, secret: m?.secret ? '[REDACTED]' : undefined });
 
 // Console metrics
-const consoleMetrics = createConsoleMetrics({ prefix: 'app' });
+const consoleMetrics = createConsoleMetrics();
 // NATS metrics
 const natsMetrics = createNatsMetrics({ natsContext: ncx, subjectRoot: 'metrics.shared' });
 

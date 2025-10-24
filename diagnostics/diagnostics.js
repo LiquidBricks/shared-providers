@@ -36,7 +36,7 @@ export function diagnostics({
     if (!sample(code, level, payload) || !rateLimit(code, level)) return;
 
     const entry = { ts: now(), ...context(), ...payload };
-    try { logger?.[level]?.(entry); } catch { }
+    try { logger[level]?.(entry); } catch { }
     if (metrics && code && (level === 'error' || level === 'warn')) {
       try { metrics.count(code, 1, entry); } catch { }
     }

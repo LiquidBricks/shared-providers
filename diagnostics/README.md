@@ -313,7 +313,7 @@ diag.info('maybe sampled');
 
 Two ready-to-use metrics adapters implement the `metrics` interface expected by `diagnostics()`:
 
-- `createConsoleMetrics({ logger = console, prefix = 'metrics' })`
+- `createConsoleMetrics({ logger = console })`
   - Emits metrics as structured `info` logs via the provided `logger`.
   - Methods: `count(code, n = 1, meta)`, `timing(name, ms, meta)`.
 
@@ -328,7 +328,7 @@ import { diagnostics } from './index.js';
 import { createConsoleMetrics } from './metrics/console.js';
 // or: import { createNatsMetrics } from './metrics/nats.js';
 
-const metrics = createConsoleMetrics({ prefix: 'app' });
+const metrics = createConsoleMetrics();
 // const metrics = createNatsMetrics({ natsContext, subjectRoot: 'telemetry.metrics' });
 
 const diag = diagnostics({ metrics });
@@ -338,4 +338,3 @@ const t = diag.timer('startup');
 // ... work ...
 t.stop({ phase: 'init' });
 ```
-

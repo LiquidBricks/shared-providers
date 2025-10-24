@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 
-import { createNatsMetrics } from '../diagnostics/metrics/nats.js'
+import { createNatsMetrics } from '../../../diagnostics/metrics/nats.js'
 
 test('publishes count and timing with default subjects', async () => {
   const calls = []
@@ -28,9 +28,10 @@ test('publishes count and timing with default subjects', async () => {
   assert.equal(calls[0].subject, 'metrics.count')
   const c0 = JSON.parse(calls[0].json)
   assert.equal(c0.type, 'count')
+  assert.equal(c0.kind, 'metric')
   assert.equal(c0.code, 'ERR_DB_CONNECT')
   assert.equal(c0.n, 2)
-  assert.deepEqual(c0.meta, { host: 'db' })
+  assert.deepEqual(c0.attributes, { host: 'db' })
   assert.equal(typeof c0.ts, 'number')
   assert.ok(c0.ts >= now - 5000 && c0.ts <= Date.now() + 5000)
 
@@ -38,9 +39,10 @@ test('publishes count and timing with default subjects', async () => {
   assert.equal(calls[1].subject, 'metrics.timing')
   const c1 = JSON.parse(calls[1].json)
   assert.equal(c1.type, 'timing')
+  assert.equal(c1.kind, 'metric')
   assert.equal(c1.name, 'startup')
   assert.equal(c1.ms, 123)
-  assert.deepEqual(c1.meta, { pid: 1 })
+  assert.deepEqual(c1.attributes, { pid: 1 })
   assert.equal(typeof c1.ts, 'number')
   assert.ok(c1.ts >= now - 5000 && c1.ts <= Date.now() + 5000)
 })
@@ -99,4 +101,3 @@ test('swallows publish errors (reject and throw) without unhandled rejection', a
   assert.equal(attempts.length, 2)
   assert.equal(unhandled, null)
 })
-

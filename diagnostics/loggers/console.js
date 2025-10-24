@@ -1,27 +1,29 @@
 // Console logger adapter implementing { error, warn, info, debug }
 // Usage:
 //   import { createConsoleLogger } from './loggers/console.js'
-//   const logger = createConsoleLogger({ logger: console, prefix: 'app' })
+//   const logger = createConsoleLogger({ logger: console })
 //   logger.info({ ts: Date.now(), level: 'info', msg: 'started' })
 //
 // With diagnostics():
 //   import { diagnostics } from '../diagnostics.js'
-//   const logger = createConsoleLogger({ prefix: 'svc' })
+//   const logger = createConsoleLogger()
 //   const d = diagnostics({ logger })
 //   d.warn(false, 'CFG_DEFAULT', 'Using defaults')
 
-export function createConsoleLogger({ logger = console, prefix = 'logs' } = {}) {
-  const base = () => ({ source: prefix })
-  const safeLog = (level, entry) => {
-    try { logger?.[level]?.({ ...base(), ...entry }); } catch { /* ignore */ }
+export function createConsoleLogger({ logger = console, now = () => Date.now() } = {}) {
+  const envelope = () => ({ ts: now(), kind: 'log' })
+  const safeLog = (level, attributes) => {
+    try {
+      const payload = { ...envelope(), level, attributes }
+      logger[level](payload)
+    } catch { /* ignore */ }
   }
   return {
-    error(entry) { if (entry) safeLog('error', entry) },
-    warn(entry) { if (entry) safeLog('warn', entry) },
-    info(entry) { if (entry) safeLog('info', entry) },
-    debug(entry) { if (entry) safeLog('debug', entry) },
+    error(attributes) { if (attributes) safeLog('error', attributes) },
+    warn(attributes) { if (attributes) safeLog('warn', attributes) },
+    info(attributes) { if (attributes) safeLog('info', attributes) },
+    debug(attributes) { if (attributes) safeLog('debug', attributes) },
   }
 }
 
 export default createConsoleLogger
-

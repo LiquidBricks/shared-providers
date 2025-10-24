@@ -1,13 +1,47 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { diagnostics } from '../diagnostics/diagnostics.js'
+import { diagnostics } from '../../diagnostics/diagnostics.js'
+import * as diagnosticsMod from '../../diagnostics/diagnostics.js'
 
 function createCapturingLogger() {
   const calls = []
   const make = (level) => (entry) => calls.push([level, entry])
   return { calls, logger: { error: make('error'), warn: make('warn'), info: make('info'), debug: make('debug') } }
 }
+
+test('exports and API surface', () => {
+  assert.ok(diagnosticsMod && typeof diagnosticsMod === 'object')
+  assert.ok(typeof diagnosticsMod.diagnostics === 'function', 'expected named export diagnostics()')
+  assert.equal('default' in diagnosticsMod, false, 'unexpected default export on diagnostics module')
+
+  const noop = () => {}
+  const d = diagnosticsMod.diagnostics({
+    logger: { error: noop, warn: noop, info: noop, debug: noop },
+    rateLimit: () => true,
+    sample: () => true,
+  })
+
+  const expectedKeys = [
+    'invariant', 'require', 'error', 'warn', 'info', 'debug',
+    'once', 'warnOnce', 'timer', 'child', 'withContext', 'DiagnosticError'
+  ]
+  for (const k of expectedKeys) {
+    assert.ok(k in d, `missing diagnostics property: ${k}`)
+  }
+  assert.equal(typeof d.invariant, 'function')
+  assert.equal(typeof d.require, 'function')
+  assert.equal(typeof d.error, 'function')
+  assert.equal(typeof d.warn, 'function')
+  assert.equal(typeof d.info, 'function')
+  assert.equal(typeof d.debug, 'function')
+  assert.equal(typeof d.once, 'function')
+  assert.equal(typeof d.warnOnce, 'function')
+  assert.equal(typeof d.timer, 'function')
+  assert.equal(typeof d.child, 'function')
+  assert.equal(typeof d.withContext, 'function')
+  assert.equal(typeof d.DiagnosticError, 'function')
+})
 
 test('emits structured logs, redacts meta, and counts warn/error', () => {
   const { calls, logger } = createCapturingLogger()
@@ -168,4 +202,3 @@ test('child and withContext compose context; warnOnce only logs once per code', 
   const warnCount = calls.filter(([lvl, e]) => lvl === 'warn' && e.code === uniq).length
   assert.equal(warnCount, 1)
 })
-

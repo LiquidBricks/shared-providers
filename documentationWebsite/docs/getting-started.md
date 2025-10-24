@@ -75,7 +75,7 @@ await r.request({ subject: 'user.created' });
 
 // Diagnostics with console and NATS metrics
 const ncx = createNatsContext({ servers: 'nats://localhost:4222' });
-const dConsole = diagnostics({ metrics: createConsoleMetrics({ prefix: 'app' }) });
+const dConsole = diagnostics({ metrics: createConsoleMetrics() });
 const dNats = diagnostics({ metrics: createNatsMetrics({ natsContext: ncx }) });
 dConsole.info('hello');
 dNats.warn(false, 'DEMO_WARN', 'something to notice');
