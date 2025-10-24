@@ -13,7 +13,9 @@
     "./codes": "./codes.js",
     "./diagnostics": "./diagnostics/diagnostics.js",
     "./diagnostics/metrics/nats": "./diagnostics/metrics/nats.js",
-    "./diagnostics/metrics/console": "./diagnostics/metrics/console.js"
+    "./diagnostics/metrics/console": "./diagnostics/metrics/console.js",
+    "./diagnostics/loggers/nats": "./diagnostics/loggers/nats.js",
+    "./diagnostics/loggers/console": "./diagnostics/loggers/console.js"
   },
   "sideEffects": false,
   "scripts": {
