@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { router } from '../../../subjectFactory/index.js'
+import { s } from '../../../subjectFactory/router.js'
 
 test('route can extend tokens per-branch and match subjects', async () => {
   const r = router({ tokens: ['telemetryNS', 'channel'] })
@@ -26,7 +27,7 @@ test('route can extend tokens per-branch and match subjects', async () => {
 
   // tele.log.v1
   let res = await r.request({ subject: 'tele.log.v1' })
-  assert.equal(res.scope.result, 'LOG')
+  assert.equal(res.scope[s.scope.result], 'LOG')
   assert.deepEqual(res.info.params, {
     telemetryNS: 'tele',
     channel: 'log',
@@ -35,7 +36,7 @@ test('route can extend tokens per-branch and match subjects', async () => {
 
   // tele.metric.counter.v1
   res = await r.request({ subject: 'tele.metric.counter.v1' })
-  assert.equal(res.scope.result, 'COUNTER')
+  assert.equal(res.scope[s.scope.result], 'COUNTER')
   assert.deepEqual(res.info.params, {
     telemetryNS: 'tele',
     channel: 'metric',
@@ -45,7 +46,7 @@ test('route can extend tokens per-branch and match subjects', async () => {
 
   // tele.metric.histogram.v1
   res = await r.request({ subject: 'tele.metric.histogram.v1' })
-  assert.equal(res.scope.result, 'HIST')
+  assert.equal(res.scope[s.scope.result], 'HIST')
   assert.deepEqual(res.info.params, {
     telemetryNS: 'tele',
     channel: 'metric',
@@ -53,4 +54,3 @@ test('route can extend tokens per-branch and match subjects', async () => {
     version: 'v1',
   })
 })
-

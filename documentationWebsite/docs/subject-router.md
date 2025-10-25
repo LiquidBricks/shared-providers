@@ -60,6 +60,39 @@ Expected
 
 Parse subject into tokens, pick the highest-score match, and execute `pre` → `handler` → `post`. The `rootCtx` used by hooks/handlers comes from `router({ context })`.
 
+### Hook arguments
+
+Every `pre`, `handler`, and `post` is called with a single object containing:
+
+- `rootCtx`: the router-level context object from `router({ context })`.
+- `info`: execution metadata for this request
+  - `subject`: the dot-separated subject string passed to `request`.
+  - `params`: an object mapping each configured token name to its string value (or `undefined` when missing).
+  - `tokens`: the array of configured token names in order.
+- `message`: the value provided via `request({ subject, message })` (transparent passthrough).
+- `scope`: a shared, per-request object across `pre` → `handler` → `post`
+  - If a hook/handler returns an object, its properties are merged into `scope`.
+  - The handler’s return value is also assigned to `scope.result`.
+
+Example
+
+```js
+const r = router({ tokens: ['a', 'b'], context: { requestId: 'r-123' } });
+
+const pre = ({ rootCtx, info, message, scope }) => {
+  console.log(rootCtx.requestId, info.subject, info.params.a, message);
+  return { startedAt: Date.now() }; // merged into scope
+};
+
+const handler = ({ scope }) => ({ handled: true }); // merged; also scope.result is set
+
+const post = ({ scope }) => { scope.finished = true };
+
+r.route({ a: 'x' }, { pre: [pre], handler, post: [post] });
+const { scope } = await r.request({ subject: 'x.y', message: { hello: 'world' } });
+// scope: { startedAt: <ts>, handled: true, finished: true, result: { handled: true } }
+```
+
 ### Subject mapping
 
 ```js
@@ -211,6 +244,60 @@ Expected
 - `exp.best.handlerName` -> `'childHandler'`; `exp.best.score` -> `2`
 - `exp.competing` includes the lower-score `bOnly` route.
 - When no route matches, `best.kind` is `'default'` (if set).
+
+## Abort Flow
+
+The router provides a per-request AbortController exposed on `scope` via a symbol, and a router-level abort handler.
+
+- `SCOPE_ABORT` (symbol): imported from `@liquid-bricks/shared-providers/subject/router` and used to access the controller on `scope[SCOPE_ABORT]`.
+- `router().abort(fn)`: register a single abort handler. Runs when the request’s AbortController is aborted.
+- Pipeline checks `signal.aborted` before each `pre`, before the `handler`, and before each `post`. If aborted, processing stops immediately and the abort handler runs.
+- If the abort handler returns an object, it is merged into `scope`. No error handlers run on abort.
+
+Example: abort in a pre hook
+
+```js
+import { router } from '@liquid-bricks/shared-providers/subject';
+import { SCOPE_ABORT } from '@liquid-bricks/shared-providers/subject/router';
+
+const r = router({ tokens: ['a'] })
+
+r.abort(({ reason, stage, scope }) => {
+  // reason carries the value passed to abort(reason)
+  return { status: `aborted-${stage}`, reason }
+})
+
+r.route({ a: 'x' }, {
+  pre: [({ scope }) => {
+    const ac = scope[SCOPE_ABORT]
+    ac.abort('cut')
+  }],
+  handler() { /* never reached */ },
+  post: [() => {}] // never reached
+})
+
+const { scope } = await r.request({ subject: 'x' })
+// scope.status === 'aborted-pre'
+// scope.reason === 'cut'
+```
+
+Example: abort in post, preserving handler result
+
+```js
+import { SCOPE_ABORT } from '@liquid-bricks/shared-providers/subject/router';
+
+const r = router({ tokens: ['a'] })
+r.abort(() => ({ status: 'post-aborted' }))
+
+r.route({ a: 'x' }, {
+  handler: () => 'H',
+  post: [({ scope }) => scope[SCOPE_ABORT].abort('stop'), () => {/* not reached */}]
+})
+
+const { scope } = await r.request({ subject: 'x' })
+// scope.result === 'H' (handler result preserved)
+// scope.status === 'post-aborted'
+```
 
 ## Method: prettyTrie()
 

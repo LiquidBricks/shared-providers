@@ -6,6 +6,14 @@
 
 import { ROUTER_CONFIG_TOKENS_REQUIRED, ROUTER_TOKENS_REQUIRED, ROUTER_SUBJECT_REQUIRED, ROUTER_TOKEN_UNKNOWN, ROUTER_ROUTE_HANDLER_REQUIRED, ROUTER_ROUTE_HANDLER_FORBIDDEN, ROUTER_SUBROUTE_OVERRIDE, ROUTER_CHILDREN_SHAPE_INVALID } from '../codes.js'
 
+// Symbols for router scope — namespaced for future growth
+export const s = Object.freeze({
+  scope: Object.freeze({
+    abort: Symbol('router.scope.abort'),
+    result: Symbol('router.scope.result'),
+  })
+})
+
 function assertTokens(config) {
   if (!config || typeof config !== 'object' || !Array.isArray(config.tokens)) {
     const err = new Error('router config with `tokens` array is required')
@@ -32,6 +40,8 @@ export function router(config = {}) {
   const trie = {}
   // Optional error handler set via api.error(fn)
   let onError = null
+  // Optional abort handler set via api.abort(fn)
+  let onAbort = null
 
   const api = {
     get config() { return config },
@@ -46,11 +56,25 @@ export function router(config = {}) {
 
     // Register a router-level error handler invoked when any pre/handler/post throws
     error(fn) { if (typeof fn === 'function') onError = fn; else onError = null; return api },
+    // Register a router-level abort handler invoked when AbortController is aborted
+    abort(fn) { if (typeof fn === 'function') onAbort = fn; else onAbort = null; return api },
 
     route(values = {}, routeConfig = {}) {
       // Internal helper to support pre/post aggregation across nested children
       // activeTokens represents the ordered token names available along this subtree
-      const defineRoute = (vals = {}, cfg = {}, aggPre = [], aggPost = [], aggOnPreErr = [], aggOnPostErr = [], aggOnHandlerErr = [], aggOnErr = [], activeTokens = tokens.slice()) => {
+      const defineRoute = (
+        vals = {},
+        cfg = {},
+        aggDecode = [],
+        aggPre = [],
+        aggPost = [],
+        aggOnDecodeErr = [],
+        aggOnPreErr = [],
+        aggOnPostErr = [],
+        aggOnHandlerErr = [],
+        aggOnErr = [],
+        activeTokens = tokens.slice()
+      ) => {
         if (vals == null || typeof vals !== 'object') vals = {}
         for (const k of Object.keys(vals)) {
           if (!activeTokens.includes(k)) {
@@ -77,17 +101,21 @@ export function router(config = {}) {
         const hasHandler = typeof cfg?.handler === 'function'
 
         // Normalize hooks
+        const decodeHooks = Array.isArray(cfg?.decode) ? cfg.decode.filter(fn => typeof fn === 'function') : []
         const preHooks = Array.isArray(cfg?.pre) ? cfg.pre.filter(fn => typeof fn === 'function') : []
         const postHooks = Array.isArray(cfg?.post) ? cfg.post.filter(fn => typeof fn === 'function') : []
         // Normalize error hooks (allow arrays or single functions)
+        const onDecodeErrorHooks = Array.isArray(cfg?.onDecodeError) ? cfg.onDecodeError.filter(fn => typeof fn === 'function') : (typeof cfg?.onDecodeError === 'function' ? [cfg.onDecodeError] : [])
         const onPreErrorHooks = Array.isArray(cfg?.onPreError) ? cfg.onPreError.filter(fn => typeof fn === 'function') : (typeof cfg?.onPreError === 'function' ? [cfg.onPreError] : [])
         const onPostErrorHooks = Array.isArray(cfg?.onPostError) ? cfg.onPostError.filter(fn => typeof fn === 'function') : (typeof cfg?.onPostError === 'function' ? [cfg.onPostError] : [])
         const onHandlerErrorHooks = Array.isArray(cfg?.onHandlerError) ? cfg.onHandlerError.filter(fn => typeof fn === 'function') : (typeof cfg?.onHandlerError === 'function' ? [cfg.onHandlerError] : [])
         const onErrorHooks = Array.isArray(cfg?.onError) ? cfg.onError.filter(fn => typeof fn === 'function') : (typeof cfg?.onError === 'function' ? [cfg.onError] : [])
-        // Aggregate pre in parent→child order; post in child→parent order
+        // Aggregate decode/pre in parent→child order; post in child→parent order
+        const nextDecode = aggDecode.length > 0 ? (decodeHooks.length > 0 ? aggDecode.concat(decodeHooks) : aggDecode.slice()) : decodeHooks.slice()
         const nextPre = aggPre.length > 0 ? (preHooks.length > 0 ? aggPre.concat(preHooks) : aggPre.slice()) : preHooks.slice()
         const nextPost = aggPost.length > 0 ? (postHooks.length > 0 ? postHooks.concat(aggPost) : aggPost.slice()) : postHooks.slice()
         // Error handlers aggregate for locality LIFO (child-first). Put current level before existing agg.
+        const nextOnDecodeErr = onDecodeErrorHooks.length > 0 ? onDecodeErrorHooks.concat(aggOnDecodeErr) : aggOnDecodeErr.slice()
         const nextOnPreErr = onPreErrorHooks.length > 0 ? onPreErrorHooks.concat(aggOnPreErr) : aggOnPreErr.slice()
         const nextOnPostErr = onPostErrorHooks.length > 0 ? onPostErrorHooks.concat(aggOnPostErr) : aggOnPostErr.slice()
         const nextOnHandlerErr = onHandlerErrorHooks.length > 0 ? onHandlerErrorHooks.concat(aggOnHandlerErr) : aggOnHandlerErr.slice()
@@ -157,13 +185,27 @@ export function router(config = {}) {
 
             // Combine values (parent precedence) and recurse with aggregated hooks
             const combinedValues = { ...childValues, ...vals }
-            defineRoute(combinedValues, childConfig, nextPre, nextPost, nextOnPreErr, nextOnPostErr, nextOnHandlerErr, nextOnErr, extendedTokens)
+            defineRoute(
+              combinedValues,
+              childConfig,
+              nextDecode,
+              nextPre,
+              nextPost,
+              nextOnDecodeErr,
+              nextOnPreErr,
+              nextOnPostErr,
+              nextOnHandlerErr,
+              nextOnErr,
+              extendedTokens
+            )
           }
         } else if (hasHandler) {
           node.$leaf = true
           node.$handler = cfg.handler
+          if (nextDecode.length > 0) node.$decode = nextDecode
           if (nextPre.length > 0) node.$pre = nextPre
           if (nextPost.length > 0) node.$post = nextPost
+          if (nextOnDecodeErr.length > 0) node.$onDecodeError = nextOnDecodeErr
           if (nextOnPreErr.length > 0) node.$onPreError = nextOnPreErr
           if (nextOnPostErr.length > 0) node.$onPostError = nextOnPostErr
           if (nextOnHandlerErr.length > 0) node.$onHandlerError = nextOnHandlerErr
@@ -173,7 +215,7 @@ export function router(config = {}) {
         routes.push({ values: { ...vals }, config: cfg })
       }
 
-      defineRoute(values, routeConfig, [], [], [], [], [], [], tokens.slice())
+      defineRoute(values, routeConfig, [], [], [], [], [], [], [], [], tokens.slice())
       return api
     },
 
@@ -197,15 +239,19 @@ export function router(config = {}) {
       trie.$leaf = true
       trie.$handler = routeConfig.handler
       // Normalize and store hooks
+      const decodeHooks = Array.isArray(routeConfig?.decode) ? routeConfig.decode.filter(fn => typeof fn === 'function') : []
       const preHooks = Array.isArray(routeConfig?.pre) ? routeConfig.pre.filter(fn => typeof fn === 'function') : []
       const postHooks = Array.isArray(routeConfig?.post) ? routeConfig.post.filter(fn => typeof fn === 'function') : []
       // Normalize error hooks on default
+      const onDecodeErrorHooks = Array.isArray(routeConfig?.onDecodeError) ? routeConfig.onDecodeError.filter(fn => typeof fn === 'function') : (typeof routeConfig?.onDecodeError === 'function' ? [routeConfig.onDecodeError] : [])
       const onPreErrorHooks = Array.isArray(routeConfig?.onPreError) ? routeConfig.onPreError.filter(fn => typeof fn === 'function') : (typeof routeConfig?.onPreError === 'function' ? [routeConfig.onPreError] : [])
       const onPostErrorHooks = Array.isArray(routeConfig?.onPostError) ? routeConfig.onPostError.filter(fn => typeof fn === 'function') : (typeof routeConfig?.onPostError === 'function' ? [routeConfig.onPostError] : [])
       const onHandlerErrorHooks = Array.isArray(routeConfig?.onHandlerError) ? routeConfig.onHandlerError.filter(fn => typeof fn === 'function') : (typeof routeConfig?.onHandlerError === 'function' ? [routeConfig.onHandlerError] : [])
       const onErrorHooks = Array.isArray(routeConfig?.onError) ? routeConfig.onError.filter(fn => typeof fn === 'function') : (typeof routeConfig?.onError === 'function' ? [routeConfig.onError] : [])
+      if (decodeHooks.length > 0) trie.$decode = decodeHooks
       if (preHooks.length > 0) trie.$pre = preHooks
       if (postHooks.length > 0) trie.$post = postHooks
+      if (onDecodeErrorHooks.length > 0) trie.$onDecodeError = onDecodeErrorHooks
       if (onPreErrorHooks.length > 0) trie.$onPreError = onPreErrorHooks
       if (onPostErrorHooks.length > 0) trie.$onPostError = onPostErrorHooks
       if (onHandlerErrorHooks.length > 0) trie.$onHandlerError = onHandlerErrorHooks
@@ -275,15 +321,17 @@ export function router(config = {}) {
       const rootCtx = routerContext
 
       // Depth-first search across base+extension tokens to find best matching leaf
-      const best = { score: -1, handler: null, pre: [], post: [], onPreErr: [], onPostErr: [], onHandlerErr: [], onErr: [], paramsExt: {}, extSeq: [] }
+      const best = { score: -1, handler: null, decode: [], pre: [], post: [], onDecodeErr: [], onPreErr: [], onPostErr: [], onHandlerErr: [], onErr: [], paramsExt: {}, extSeq: [] }
       const collectBest = (node, baseStartIndex, matchedCount, extSeq, extIdx, paramsExt) => {
         if (!node) return
         if (typeof node.$handler === 'function') {
           if (matchedCount > best.score) {
             best.score = matchedCount
             best.handler = node.$handler
+            best.decode = Array.isArray(node.$decode) ? node.$decode : []
             best.pre = Array.isArray(node.$pre) ? node.$pre : []
             best.post = Array.isArray(node.$post) ? node.$post : []
+            best.onDecodeErr = Array.isArray(node.$onDecodeError) ? node.$onDecodeError : []
             best.onPreErr = Array.isArray(node.$onPreError) ? node.$onPreError : []
             best.onPostErr = Array.isArray(node.$onPostError) ? node.$onPostError : []
             best.onHandlerErr = Array.isArray(node.$onHandlerError) ? node.$onHandlerError : []
@@ -346,6 +394,9 @@ export function router(config = {}) {
 
         // Initialize shared scope for this pipeline execution
         const scope = {}
+        // Create an AbortController for this request and attach via symbol to scope
+        const ac = new AbortController()
+        scope[s.scope.abort] = ac
 
         // Helper to merge object return values into scope
         const mergeIntoScope = (val) => {
@@ -354,7 +405,9 @@ export function router(config = {}) {
 
         // Helper to run error handlers chain: specific first (LIFO by scope), then generic; cascade only on rethrow
         const runErrorHandlers = async ({ stage, index, failingFn, error }) => {
-          const specific = stage === 'pre' ? best.onPreErr : (stage === 'post' ? best.onPostErr : best.onHandlerErr)
+          const specific = stage === 'decode'
+            ? best.onDecodeErr
+            : (stage === 'pre' ? best.onPreErr : (stage === 'post' ? best.onPostErr : best.onHandlerErr))
           const generic = best.onErr
           const chain = []
           if (Array.isArray(specific) && specific.length > 0) chain.push(...specific)
@@ -377,12 +430,35 @@ export function router(config = {}) {
           throw lastError
         }
 
+        // Helper to run abort handler (if any) and finalize
+        const runAbortHandler = async ({ stage, index, failingFn }) => {
+          if (typeof onAbort === 'function') {
+            const r = await onAbort({ reason: ac.signal?.reason, signal: ac.signal, stage, index, fn: failingFn, rootCtx, info, message, scope })
+            if (r && typeof r === 'object') Object.assign(scope, r)
+          }
+          return Object.freeze({ ctx, info, scope })
+        }
+
         // Merge extension params from best match into info.params
         if (best.paramsExt && typeof best.paramsExt === 'object') Object.assign(params, best.paramsExt)
+
+        // Run decode hooks in order (supports async)
+        for (let i = 0; i < best.decode.length; i++) {
+          const fn = best.decode[i]
+          if (ac.signal?.aborted) return await runAbortHandler({ stage: 'decode', index: i, failingFn: fn })
+          try {
+            const r = await fn({ rootCtx, info, message, scope })
+            mergeIntoScope(r)
+          } catch (error) {
+            const handled = await runErrorHandlers({ stage: 'decode', index: i, failingFn: fn, error })
+            if (handled) return Object.freeze({ ctx, info, scope })
+          }
+        }
 
         // Run pre hooks in order (supports async)
         for (let i = 0; i < best.pre.length; i++) {
           const fn = best.pre[i]
+          if (ac.signal?.aborted) return await runAbortHandler({ stage: 'pre', index: i, failingFn: fn })
           try {
             const r = await fn({ rootCtx, info, message, scope })
             mergeIntoScope(r)
@@ -391,13 +467,15 @@ export function router(config = {}) {
             if (handled) return Object.freeze({ ctx, info, scope })
           }
         }
+        // Before handler, check for abort
+        if (ac.signal?.aborted) return await runAbortHandler({ stage: 'handler', failingFn: best.handler })
         // Run handler (supports async)
         let res
         try {
           res = await best.handler({ rootCtx, info, message, scope })
           mergeIntoScope(res)
-          // Record handler's return value on scope.result
-          scope.result = res
+          // Record handler's return value on symbol-keyed result
+          scope[s.scope.result] = res
         } catch (error) {
           const handled = await runErrorHandlers({ stage: 'handler', failingFn: best.handler, error })
           if (handled) return Object.freeze({ ctx, info, scope })
@@ -405,6 +483,7 @@ export function router(config = {}) {
         // Run post hooks in order (supports async)
         for (let i = 0; i < best.post.length; i++) {
           const fn = best.post[i]
+          if (ac.signal?.aborted) return await runAbortHandler({ stage: 'post', index: i, failingFn: fn })
           try {
             const r = await fn({ rootCtx, info, message, scope })
             mergeIntoScope(r)

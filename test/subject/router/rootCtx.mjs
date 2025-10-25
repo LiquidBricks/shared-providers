@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { router } from '../../../subjectFactory/index.js'
+import { s } from '../../../subjectFactory/router.js'
 
 test('pre/handler/post receive rootCtx and message', async () => {
   const reqCtx = { requestId: 'r-123', user: 'alice' }
@@ -17,7 +18,7 @@ test('pre/handler/post receive rootCtx and message', async () => {
 
   const message = { hello: 'world' }
   const { info, scope } = await r.request({ subject: 'x', message })
-  assert.equal(scope.result, 'ok')
+  assert.equal(scope[s.scope.result], 'ok')
   assert.equal(seen.pre, reqCtx)
   assert.equal(seen.handler, reqCtx)
   assert.equal(seen.post, reqCtx)

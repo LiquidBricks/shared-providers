@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { router } from '../../../../subjectFactory/index.js'
+import { s } from '../../../../subjectFactory/router.js'
 
 test('request executes only highest-score matching leaf', async () => {
   const r = router({ tokens: ['a', 'b'] })
@@ -13,5 +14,5 @@ test('request executes only highest-score matching leaf', async () => {
 
   const { info, scope } = await r.request({ subject: 'x.y' })
   assert.deepEqual(calls, [['onAB', 'xy']])
-  assert.equal(scope.result, 'AB')
+  assert.equal(scope[s.scope.result], 'AB')
 })

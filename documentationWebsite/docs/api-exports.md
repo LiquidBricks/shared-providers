@@ -25,6 +25,8 @@ Example imports:
 ```js
 import createNatsContext from '@liquid-bricks/shared-providers/nats-context';
 import { telemetry, router } from '@liquid-bricks/shared-providers/subject';
+// Router internals (symbol for AbortController access)
+import { SCOPE_ABORT } from '@liquid-bricks/shared-providers/subject/router';
 import { SUBJECT_TOKEN_COUNT } from '@liquid-bricks/shared-providers/codes';
 ```
 

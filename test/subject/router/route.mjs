@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { router } from '../../../subjectFactory/index.js'
+import { s } from '../../../subjectFactory/router.js'
 
 test('route rejects unknown tokens', () => {
   const r = router({ tokens: ['a', 'b', 'c', 'd'] })
@@ -60,7 +61,7 @@ test('pre/post run order around handler', async () => {
 
   const { info, scope } = await r.request({ subject: 'x' })
   assert.deepEqual(calls, ['pre1:x', 'pre2:x', 'handler:x', 'post1:x'])
-  assert.equal(scope.result, 'H')
+  assert.equal(scope[s.scope.result], 'H')
 })
 
 test('async pre/handler/post execute in order', async () => {
@@ -74,7 +75,7 @@ test('async pre/handler/post execute in order', async () => {
 
   const { info, scope } = await r.request({ subject: 'x' })
   assert.deepEqual(calls, ['pre1:x', 'pre2:x', 'handler:x', 'post1:x'])
-  assert.equal(scope.result, 'HA')
+  assert.equal(scope[s.scope.result], 'HA')
 })
 
 test('pre/post aggregate from parent to children', async () => {
@@ -96,5 +97,5 @@ test('pre/post aggregate from parent to children', async () => {
 
   const { info, scope } = await r.request({ subject: 'x.y' })
   assert.deepEqual(calls, ['ppre:xy', 'cpre:xy', 'handler:xy', 'cpost:xy', 'ppost:xy'])
-  assert.equal(scope.result, 'HC')
+  assert.equal(scope[s.scope.result], 'HC')
 })

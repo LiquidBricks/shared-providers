@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { router } from '../../../subjectFactory/index.js'
+import { s } from '../../../subjectFactory/router.js'
 
 test('onPreError handles pre error and stops; no generic run', async () => {
   const r = router({ tokens: ['a'] })
@@ -11,13 +12,13 @@ test('onPreError handles pre error and stops; no generic run', async () => {
   r.route({ a: 'x' }, {
     pre: [pre1],
     handler,
-    onPreError: [({ error, stage }) => { calls.push('onPreError:' + stage + ':' + error.message); return { result: 'ERR' } }],
+    onPreError: [({ error, stage }) => { calls.push('onPreError:' + stage + ':' + error.message); return { [s.scope.result]: 'ERR' } }],
     onError: [() => { calls.push('onError'); }]
   })
 
   const { scope } = await r.request({ subject: 'x' })
   assert.deepEqual(calls, ['pre1', 'onPreError:pre:boom-pre'])
-  assert.equal(scope.result, 'ERR')
+  assert.equal(scope[s.scope.result], 'ERR')
   assert.ok(scope.error instanceof Error)
 })
 
@@ -47,7 +48,7 @@ test('scope locality LIFO: child stage-specific runs before parent generic', asy
     onError: [({ error, stage }) => { calls.push('parent:onError:' + stage + ':' + error.message); throw error }],
     children: [[
       { a: 'x' }, {
-        onPreError: [({ error }) => { calls.push('child:onPreError:' + error.message); return { result: 'ERR' } }],
+        onPreError: [({ error }) => { calls.push('child:onPreError:' + error.message); return { [s.scope.result]: 'ERR' } }],
         handler() { calls.push('child:handler') }
       }]
     ]
@@ -55,7 +56,7 @@ test('scope locality LIFO: child stage-specific runs before parent generic', asy
 
   const { scope } = await r.request({ subject: 'x' })
   assert.deepEqual(calls, ['ppre', 'child:onPreError:E1'])
-  assert.equal(scope.result, 'ERR')
+  assert.equal(scope[s.scope.result], 'ERR')
   assert.ok(scope.error instanceof Error)
 })
 
@@ -88,7 +89,7 @@ test('onPostError handles post throw; preserves prior result', async () => {
 
   const { scope } = await r.request({ subject: 'x' })
   assert.deepEqual(calls, ['handler', 'post1', 'onPostError:boom-post'])
-  assert.equal(scope.result, 'H')
+  assert.equal(scope[s.scope.result], 'H')
   assert.ok(scope.error instanceof Error)
   assert.equal(scope.tagged, true)
 })
