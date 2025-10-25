@@ -101,3 +101,64 @@ test('swallows publish errors (reject and throw) without unhandled rejection', a
   assert.equal(attempts.length, 2)
   assert.equal(unhandled, null)
 })
+
+test('emits debug traces when enabled (default subject)', async () => {
+  const logs = []
+  const orig = console.log
+  console.log = (...args) => logs.push(args)
+  try {
+    const natsContext = { publish: (_subject, _json) => Promise.resolve() }
+    const metrics = createNatsMetrics({ natsContext, subjectRoot: 'metrics', debug: true, now: () => 1700000000000 })
+
+    metrics.count('C1', 2, { a: 1 })
+    metrics.timing('T1', 5, { b: 2 })
+    // invalids to exercise skip paths
+    metrics.count('', 1)
+    metrics.timing('X', 'nope')
+
+    await delay(0)
+
+    const tags = logs
+      .filter(a => Array.isArray(a) && a[0] === '[diagnostics][nats:metrics]')
+      .map(a => a[1])
+
+    // init and default subject resolution
+    assert.ok(tags.includes('init'))
+    assert.ok(tags.includes('subject:default'))
+    // publish lifecycle + composition
+    assert.ok(tags.includes('compose'))
+    assert.ok(tags.includes('publish:start'))
+    assert.ok(tags.includes('publish:json'))
+    assert.ok(tags.includes('publish:ok'))
+    // skipped invalids
+    assert.ok(tags.includes('skip:invalid-count'))
+    assert.ok(tags.includes('skip:invalid-timing'))
+  } finally {
+    console.log = orig
+  }
+})
+
+test('emits debug traces for custom subject function', async () => {
+  const logs = []
+  const orig = console.log
+  console.log = (...args) => logs.push(args)
+  try {
+    const natsContext = { publish: (_subject, _json) => Promise.resolve() }
+    const metrics = createNatsMetrics({
+      natsContext,
+      debug: true,
+      subject: (kind) => `svc.metrics.${kind}`,
+    })
+
+    metrics.count('OK')
+    await delay(0)
+
+    const tags = logs
+      .filter(a => Array.isArray(a) && a[0] === '[diagnostics][nats:metrics]')
+      .map(a => a[1])
+
+    assert.ok(tags.includes('subject:custom'))
+  } finally {
+    console.log = orig
+  }
+})
