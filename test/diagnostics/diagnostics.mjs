@@ -79,7 +79,7 @@ test('emits structured logs, redacts meta, and counts warn/error', () => {
   // Validate info entry
   const [l0, e0] = calls[0]
   assert.equal(l0, 'info')
-  assert.equal(e0.level, 'info')
+  // level is implied by the logger method (l0)
   assert.equal(e0.msg, 'hello')
   assert.equal(e0.component, 'svc')
   assert.equal(e0.requestId, 'r-1')
@@ -88,7 +88,7 @@ test('emits structured logs, redacts meta, and counts warn/error', () => {
   // Validate warn entry and metrics count for code
   const [l1, e1] = calls[1]
   assert.equal(l1, 'warn')
-  assert.equal(e1.level, 'warn')
+  // level is implied by the logger method (l1)
   assert.equal(e1.code, 'W1')
   assert.equal(e1.msg, 'be careful')
   assert.deepEqual(e1.meta, { secret: undefined, vis: 2 })
@@ -97,7 +97,7 @@ test('emits structured logs, redacts meta, and counts warn/error', () => {
   // Validate error entry and metrics count
   const [l2, e2] = calls[2]
   assert.equal(l2, 'error')
-  assert.equal(e2.level, 'error')
+  // level is implied by the logger method (l2)
   assert.equal(e2.code, 'E1')
   assert.equal(e2.msg, 'boom')
   assert.deepEqual(e2.meta, { secret: undefined, more: true })

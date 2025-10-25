@@ -40,6 +40,7 @@ export function diagnostics({
     const { code } = payload;
     if (!sample(code, level, payload) || !rateLimit(code, level)) return;
 
+    // Do not include level in entry; logger knows the level by method
     const entry = { ...context(), ...payload };
     try { logger[level]?.(entry); } catch { }
     if (metrics && code && (level === 'error' || level === 'warn')) {
@@ -48,7 +49,7 @@ export function diagnostics({
   };
 
   const fail = (type, code, msg, meta, opts) => {
-    emit('error', { level: 'error', code, msg, meta: redact(meta) });
+    emit('error', { code, msg, meta: redact(meta) });
     const err = new DiagnosticError(type, code, msg, meta, opts);
     throw err;
   };
@@ -70,13 +71,13 @@ export function diagnostics({
     // non-throwing signals
     warn(cond, code, msg, meta) {
       if (cond) return;
-      emit('warn', { level: 'warn', code, msg, meta: redact(meta) });
+      emit('warn', { code, msg, meta: redact(meta) });
     },
     info(msg, meta) {
-      emit('info', { level: 'info', msg, meta: redact(meta) });
+      emit('info', { msg, meta: redact(meta) });
     },
     debug(msg, meta) {
-      emit('debug', { level: 'debug', msg, meta: redact(meta) });
+      emit('debug', { msg, meta: redact(meta) });
     },
 
     // utilities
@@ -96,7 +97,7 @@ export function diagnostics({
           const ms = now() - start;
           const meta = { ...baseMeta, ...extraMeta, duration_ms: ms };
           metrics?.timing?.(name, ms, meta);
-          emit('info', { level: 'info', code: `TIMER_${name}`, msg: 'timer.stop', meta });
+          emit('info', { code: `TIMER_${name}`, msg: 'timer.stop', meta });
           return ms;
         }
       };
