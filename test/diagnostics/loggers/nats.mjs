@@ -87,3 +87,61 @@ test('swallows publish errors without unhandled rejection', async () => {
   assert.equal(attempts.length, 2)
   assert.equal(unhandled, null)
 })
+
+test('emits debug traces when enabled (default subject)', async () => {
+  const logs = []
+  const orig = console.log
+  console.log = (...args) => logs.push(args)
+  try {
+    const natsContext = { publish: (_subject, _json) => Promise.resolve() }
+    const logger = createNatsLogger({ natsContext, subjectRoot: 'logs', debug: true, now: () => 1700000000000 })
+
+    logger.info({ msg: 'ok' })
+    // Also exercise skip when attributes are missing
+    logger.debug()
+
+    await delay(0)
+
+    const tags = logs
+      .filter(a => Array.isArray(a) && a[0] === '[diagnostics][nats:logger]')
+      .map(a => a[1])
+
+    // init and default subject resolution
+    assert.ok(tags.includes('init'))
+    assert.ok(tags.includes('subject:default'))
+    // publish lifecycle + composition
+    assert.ok(tags.includes('compose'))
+    assert.ok(tags.includes('publish:start'))
+    assert.ok(tags.includes('publish:json'))
+    assert.ok(tags.includes('publish:ok'))
+    // empty attributes skip
+    assert.ok(tags.includes('skip:empty-attributes'))
+  } finally {
+    console.log = orig
+  }
+})
+
+test('emits debug traces for custom subject function', async () => {
+  const logs = []
+  const orig = console.log
+  console.log = (...args) => logs.push(args)
+  try {
+    const natsContext = { publish: (_subject, _json) => Promise.resolve() }
+    const logger = createNatsLogger({
+      natsContext,
+      debug: true,
+      subject: (level) => `svc.logs.${level}`,
+    })
+
+    logger.warn({ msg: 'warn' })
+    await delay(0)
+
+    const tags = logs
+      .filter(a => Array.isArray(a) && a[0] === '[diagnostics][nats:logger]')
+      .map(a => a[1])
+
+    assert.ok(tags.includes('subject:custom'))
+  } finally {
+    console.log = orig
+  }
+})
