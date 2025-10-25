@@ -313,8 +313,8 @@ diag.info('maybe sampled');
 
 Two ready-to-use metrics adapters implement the `metrics` interface expected by `diagnostics()`:
 
-- `createConsoleMetrics({ logger = console })`
-  - Emits metrics as structured `info` logs via the provided `logger`.
+- `createConsoleMetrics()`
+  - Emits metrics as structured `info` logs via the global `console`.
   - Methods: `count(code, n = 1, meta)`, `timing(name, ms, meta)`.
 
 - `createNatsMetrics({ natsContext, subjectRoot = 'metrics' })`

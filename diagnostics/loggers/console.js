@@ -1,7 +1,7 @@
 // Console logger adapter implementing { error, warn, info, debug }
 // Usage:
 //   import { createConsoleLogger } from './loggers/console.js'
-//   const logger = createConsoleLogger({ logger: console })
+//   const logger = createConsoleLogger()
 //   logger.info({ ts: Date.now(), level: 'info', msg: 'started' })
 //
 // With diagnostics():
@@ -10,12 +10,12 @@
 //   const d = diagnostics({ logger })
 //   d.warn(false, 'CFG_DEFAULT', 'Using defaults')
 
-export function createConsoleLogger({ logger = console, now = () => Date.now() } = {}) {
+export function createConsoleLogger({ now = () => Date.now() } = {}) {
   const envelope = () => ({ ts: now(), kind: 'log' })
   const safeLog = (level, attributes) => {
     try {
       const payload = { ...envelope(), level, attributes }
-      logger[level](payload)
+      console[level](payload)
     } catch { /* ignore */ }
   }
   return {

@@ -29,9 +29,13 @@ export function createNatsMetrics({
     try {
       const json = JSON.stringify(entry)
       const p = natsContext?.publish?.(subj, json)
-      // Avoid unhandled rejections
-      if (p && typeof p.then === 'function') p.catch(() => { })
-    } catch { /* ignore sync publish errors */ }
+      // Avoid unhandled rejections; at least log the error
+      if (p && typeof p.then === 'function') p.catch((err) => {
+        try { console.log('[diagnostics][nats:metrics] publish error:', err) } catch {}
+      })
+    } catch (err) {
+      try { console.log('[diagnostics][nats:metrics] publish error:', err) } catch {}
+    }
   }
 
   const envelope = () => ({ ts: now(), kind: 'metric' })

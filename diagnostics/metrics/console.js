@@ -1,13 +1,13 @@
 // Console metrics adapter implementing { count, timing }
 // Usage:
 //   import { createConsoleMetrics } from './metrics/console.js'
-//   const metrics = createConsoleMetrics({ logger: console })
+//   const metrics = createConsoleMetrics()
 //   metrics.count('ERR_DB_CONNECT', 1, { host: 'db' })
 //   metrics.timing('startup', 123, { pid: process.pid })
 
-export function createConsoleMetrics({ logger = console, now = () => Date.now() } = {}) {
+export function createConsoleMetrics({ now = () => Date.now() } = {}) {
   const safeLog = (entry) => {
-    try { logger.info(entry); } catch { /* ignore */ }
+    try { console.info(entry); } catch { /* ignore */ }
   };
   const envelope = () => ({ ts: now(), kind: 'metric' })
   return {

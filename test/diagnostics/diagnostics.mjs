@@ -81,7 +81,6 @@ test('emits structured logs, redacts meta, and counts warn/error', () => {
   assert.equal(l0, 'info')
   assert.equal(e0.level, 'info')
   assert.equal(e0.msg, 'hello')
-  assert.equal(e0.ts, 1111111111111)
   assert.equal(e0.component, 'svc')
   assert.equal(e0.requestId, 'r-1')
   assert.deepEqual(e0.meta, { secret: undefined, vis: 1 })

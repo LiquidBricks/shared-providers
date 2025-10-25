@@ -1,15 +1,20 @@
 // diagnostics.js
 import { NO_CODE } from '../codes.js'
+import { createConsoleLogger } from './loggers/console.js'
+import { createConsoleMetrics } from './metrics/console.js'
 
 export function diagnostics({
-  logger = console,
-  metrics = null,                     // { count(code,n,meta), timing(name,ms,meta) }
-  sample = () => true,                // (code, level, meta) => boolean
-  rateLimit = makeRateLimiter(),      // (code, level) => boolean
+  logger,                              // defaults to console providers
+  metrics,                             // defaults to console providers
+  sample = () => true,                 // (code, level, meta) => boolean
+  rateLimit = makeRateLimiter(),       // (code, level) => boolean
   redact = (m) => m ?? {},
   now = () => Date.now(),
-  context = () => ({}),               // () => { requestId, runId, subject, component, ... }
+  context = () => ({}),                // () => { requestId, runId, subject, component, ... }
 } = {}) {
+  // Default to console providers when none supplied
+  logger = logger ?? createConsoleLogger({ now })
+  metrics = metrics ?? createConsoleMetrics({ now })
 
   class DiagnosticError extends Error {
     constructor(type, code, message, meta, opts = {}) {
@@ -35,7 +40,7 @@ export function diagnostics({
     const { code } = payload;
     if (!sample(code, level, payload) || !rateLimit(code, level)) return;
 
-    const entry = { ts: now(), ...context(), ...payload };
+    const entry = { ...context(), ...payload };
     try { logger[level]?.(entry); } catch { }
     if (metrics && code && (level === 'error' || level === 'warn')) {
       try { metrics.count(code, 1, entry); } catch { }
