@@ -1,49 +1,45 @@
-import { Codes } from './codes.js';
 // diagnostics.js
+import { NO_CODE } from '../codes.js'
+import { createConsoleLogger } from './loggers/console.js'
+import { createConsoleMetrics } from './metrics/console.js'
+import { DiagnosticError } from './DiagnosticError.js'
+
 export function diagnostics({
-  logger = console,
-  metrics = null,                     // { count(code,n,meta), timing(name,ms,meta) }
-  sample = () => true,                // (code, level, meta) => boolean
-  rateLimit = makeRateLimiter(),      // (code, level) => boolean
+  logger,                              // defaults to console providers
+  metrics,                             // defaults to console providers
+  sample = () => true,                 // (code, level, meta) => boolean
+  rateLimit = makeRateLimiter(),       // (code, level) => boolean
   redact = (m) => m ?? {},
   now = () => Date.now(),
-  context = () => ({}),               // () => { requestId, runId, subject, component, ... }
+  context = () => ({}),                // () => { requestId, runId, subject, component, ... }
 } = {}) {
-
-  class DiagnosticError extends Error {
-    constructor(type, code, message, meta, opts = {}) {
-      super(message, { cause: opts.cause });
-      this.name = 'DiagnosticError';
-      this.type = type;         // 'Invariant' | 'Precondition' | 'Operational'
-      this.code = code;         // 'KV_INVARIANT_V_MISSING'
-      this.meta = redact({ ...context(), ...meta });
-    }
-    toJSON() {
-      return {
-        name: this.name,
-        type: this.type,
-        code: this.code,
-        message: this.message,
-        meta: this.meta,
-        cause: this.cause && { name: this.cause.name, message: this.cause.message }
-      };
-    }
-  }
+  // Default to console providers when none supplied
+  logger = logger ?? createConsoleLogger({ now })
+  metrics = metrics ?? createConsoleMetrics({ now })
 
   const emit = (level, payload) => {
     const { code } = payload;
     if (!sample(code, level, payload) || !rateLimit(code, level)) return;
 
-    const entry = { ts: now(), ...context(), ...payload };
-    try { logger?.[level]?.(entry); } catch { }
+    // Do not include level in entry; logger knows the level by method
+    const entry = { ...context(), ...payload };
+    try { logger[level]?.(entry); } catch { }
     if (metrics && code && (level === 'error' || level === 'warn')) {
       try { metrics.count(code, 1, entry); } catch { }
     }
   };
 
-  const fail = (type, code, msg, meta, opts) => {
-    emit('error', { level: 'error', code, msg, meta: redact(meta) });
-    const err = new DiagnosticError(type, code, msg, meta, opts);
+  const fail = (type, code, msg, meta, opts = {}) => {
+    const metaForLog = redact(meta);
+    const errorMeta = redact({ ...context(), ...(meta ?? {}) });
+    emit('error', { code, msg, meta: metaForLog });
+    const err = new DiagnosticError({
+      type,
+      code,
+      message: msg,
+      meta: errorMeta,
+      cause: opts.cause
+    });
     throw err;
   };
 
@@ -64,13 +60,13 @@ export function diagnostics({
     // non-throwing signals
     warn(cond, code, msg, meta) {
       if (cond) return;
-      emit('warn', { level: 'warn', code, msg, meta: redact(meta) });
+      emit('warn', { code, msg, meta: redact(meta) });
     },
     info(msg, meta) {
-      emit('info', { level: 'info', msg, meta: redact(meta) });
+      emit('info', { msg, meta: redact(meta) });
     },
     debug(msg, meta) {
-      emit('debug', { level: 'debug', msg, meta: redact(meta) });
+      emit('debug', { msg, meta: redact(meta) });
     },
 
     // utilities
@@ -90,7 +86,7 @@ export function diagnostics({
           const ms = now() - start;
           const meta = { ...baseMeta, ...extraMeta, duration_ms: ms };
           metrics?.timing?.(name, ms, meta);
-          emit('info', { level: 'info', code: `TIMER_${name}`, msg: 'timer.stop', meta });
+          emit('info', { code: `TIMER_${name}`, msg: 'timer.stop', meta });
           return ms;
         }
       };
@@ -121,7 +117,7 @@ export function diagnostics({
 // simple token-bucket-ish per (code,level)
 function makeRateLimiter({ bucketMs = 1000, burst = 10 } = {}) {
   const buckets = new Map(); // key -> { ts,count }
-  return (code = 'NO_CODE', level = 'info') => {
+  return (code = NO_CODE, level = 'info') => {
     const key = `${level}:${code}`;
     const now = Date.now();
     const b = buckets.get(key);
@@ -135,5 +131,3 @@ function makeRateLimiter({ bucketMs = 1000, burst = 10 } = {}) {
 }
 
 const onceCache = new Map();
-export { Codes };
-export * as metricsProviders from './metrics/index.js'
