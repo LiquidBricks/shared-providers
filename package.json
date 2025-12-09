@@ -1,11 +1,28 @@
 {
-  "name": "shared-providers",
+  "name": "@liquid-bricks/shared-providers",
   "version": "1.0.0",
   "description": "Shared diagnostics and NATS context utilities",
-  "main": "index.js",
+  "main": "./index.js",
   "type": "module",
+  "exports": {
+    "./nats-context": "./natsContext.js",
+    "./subject": "./subjectFactory/index.js",
+    "./subject/create/basic": "./subjectFactory/create/basic.js",
+    "./subject/create/telemetry": "./subjectFactory/create/telemetry.js",
+    "./subject/router": "./subjectFactory/router/index.js",
+    "./component/builder": "./componentBuilder/index.js",
+    "./component/builder/helper": "./componentBuilder/help.js",
+    "./component/provider": "./componentProvider/index.js",
+    "./codes": "./codes.js",
+    "./diagnostics": "./diagnostics/diagnostics.js",
+    "./diagnostics/metrics/nats": "./diagnostics/metrics/nats.js",
+    "./diagnostics/metrics/console": "./diagnostics/metrics/console.js",
+    "./diagnostics/loggers/nats": "./diagnostics/loggers/nats.js",
+    "./diagnostics/loggers/console": "./diagnostics/loggers/console.js"
+  },
+  "sideEffects": false,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "clear && node test/run.js"
   },
   "dependencies": {
     "@nats-io/jetstream": "^3.0.2",

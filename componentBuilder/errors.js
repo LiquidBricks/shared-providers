@@ -1,0 +1,15 @@
+export const ERRORS = {
+  componentNameRequired: 'Component name is required',
+  requiresOptionsObject: 'Requires an options object',
+  fncMustBeFunction: 'fnc must be a function',
+  requiresLabelOrList: (label = 'name') => `Requires a ${label} or list of ${label}s`,
+  requiresAtLeastOne: (label = 'name') => `Requires at least one ${label}`,
+  labelsMustBeStrings: (label = 'name') => `${label}s must be strings`,
+  labelsMustBeNonEmpty: (label = 'name') => `${label}s must be non-empty`,
+  duplicateLabel: (label = 'name', value) => `Duplicate ${label} provided: "${value}"`,
+  existingLabel: (label = 'name', value) => `${label.charAt(0).toUpperCase() + label.slice(1)} "${value}" already exists`,
+  deferredDepsExclusive: 'Data depending on deferred may not declare other dependencies',
+  deferredDepsNoFunction: 'Data depending on deferred may not provide a fnc',
+  importHashMustBeString: 'Import hash must be a non-empty string',
+  injectMustBeFunction: 'inject must be a function',
+};
