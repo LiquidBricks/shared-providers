@@ -18,6 +18,7 @@ const expectedExportKeys = [
   './subject/create/basic',
   './subject/create/telemetry',
   './subject/router',
+  './component/agent',
   './component/builder',
   './component/builder/helper',
   './codes',

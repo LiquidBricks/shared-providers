@@ -10,6 +10,7 @@
     "./subject/create/basic": "./subjectFactory/create/basic.js",
     "./subject/create/telemetry": "./subjectFactory/create/telemetry.js",
     "./subject/router": "./subjectFactory/router/index.js",
+    "./component/agent": "./componentAgent/index.js",
     "./component/builder": "./componentBuilder/index.js",
     "./component/builder/helper": "./componentBuilder/help.js",
     "./codes": "./codes.js",
@@ -26,7 +27,8 @@
   "dependencies": {
     "@nats-io/jetstream": "^3.0.2",
     "@nats-io/kv": "^3.0.2",
-    "@nats-io/transport-node": "^3.0.2"
+    "@nats-io/transport-node": "^3.0.2",
+    "ws": "^8.18.3"
   },
   "license": "ISC"
 }
