@@ -12,7 +12,6 @@
     "./subject/router": "./subjectFactory/router/index.js",
     "./component/builder": "./componentBuilder/index.js",
     "./component/builder/helper": "./componentBuilder/help.js",
-    "./component/provider": "./componentProvider/index.js",
     "./codes": "./codes.js",
     "./diagnostics": "./diagnostics/diagnostics.js",
     "./diagnostics/metrics/nats": "./diagnostics/metrics/nats.js",
