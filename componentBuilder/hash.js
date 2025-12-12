@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isAComponent, s } from './help.js'
 
 export function computeComponentHash(name, nodes = {}) {
   const data = normalizeNodeDefinitions(nodes.data);
@@ -19,7 +20,7 @@ function normalizeImportDefinitions(importMap = new Map()) {
   return Array.from(importMap.entries())
     .map(([name, { hash, inject }]) => ({
       name,
-      hash: String(hash).trim(),
+      hash: normalizeImportHash(hash),
       inject: normalizeImportInject(inject),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -58,4 +59,13 @@ function normalizeSources(sources) {
         : [sources];
 
   return Array.from(new Set(list.map(String))).sort();
+}
+
+function normalizeImportHash(hash) {
+  if (typeof hash === 'string') return hash.trim();
+  if (isAComponent(hash)) {
+    const componentHash = hash?.[s.INTERNALS]?.hash?.();
+    return typeof componentHash === 'string' ? componentHash.trim() : '';
+  }
+  return String(hash).trim();
 }

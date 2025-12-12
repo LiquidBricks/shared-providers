@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { component } from '../../componentBuilder/index.js'
+import { computeComponentHash } from '../../componentBuilder/hash.js'
 import { s, isAComponent } from '../../componentBuilder/help.js'
 
 const thisTestFile = fileURLToPath(import.meta.url)
@@ -257,6 +258,29 @@ test('hashing', async (t) => {
     const regB = asRegistration(withInjectB)
 
     assert.notEqual(regA.hash, regB.hash)
+  })
+
+  await t.test('uses component hash when import hash is provided as a component instance', () => {
+    const external = component('shared-lib').data('value', { fnc: () => 1 })
+    const externalHash = asRegistration(external).hash
+
+    const computedWithComponent = computeComponentHash('consumer', {
+      data: new Map(),
+      tasks: new Map(),
+      imports: new Map([
+        ['shared', { hash: external, inject: {} }]
+      ]),
+    })
+
+    const computedWithString = computeComponentHash('consumer', {
+      data: new Map(),
+      tasks: new Map(),
+      imports: new Map([
+        ['shared', { hash: externalHash, inject: {} }]
+      ]),
+    })
+
+    assert.equal(computedWithComponent, computedWithString)
   })
 
   await t.test('is deterministic for the same component shape', () => {
