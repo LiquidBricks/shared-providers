@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { ERRORS } from "./errors.js";
+import { isAComponent, s } from "./help.js";
 
 const defaultDataDeps = ({ deferred: { deferred } }) => { }
 
@@ -34,11 +35,28 @@ export function checkTaskDefinition(definition) {
 export function checkImportDefinition(definition) {
   assert(definition && typeof definition === 'object', ERRORS.requiresOptionsObject);
   const { hash, inject } = definition;
-  assert(typeof hash === 'string' && hash.trim() !== '', ERRORS.importHashMustBeString);
+  const normalizedHash = normalizeImportHash(hash);
   if (inject !== undefined) {
     assert(typeof inject === 'function', ERRORS.injectMustBeFunction);
   }
-  return { hash: hash.trim(), inject };
+  return { hash: normalizedHash, inject };
+}
+
+function normalizeImportHash(hash) {
+  if (typeof hash === 'string') {
+    const trimmed = hash.trim();
+    assert(trimmed !== '', ERRORS.importHashMustBeString);
+    return trimmed;
+  }
+
+  if (isAComponent(hash)) {
+    const internalHash = hash?.[s.INTERNALS]?.hash?.();
+    const trimmed = typeof internalHash === 'string' ? internalHash.trim() : '';
+    assert(trimmed !== '', ERRORS.importHashMustBeString);
+    return trimmed;
+  }
+
+  assert(false, ERRORS.importHashMustBeString);
 }
 
 export function normalizeNames(nameOrNames, label = 'name') {

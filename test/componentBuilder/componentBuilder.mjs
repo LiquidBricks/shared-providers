@@ -125,6 +125,24 @@ test('import registration', async (t) => {
     assert.throws(() => comp.import('shared', { hash: 'abc', inject: [] }), /inject must be a function/i)
   })
 
+  await t.test('accepts a component instance as the hash source', () => {
+    const external = component('external-lib')
+      .data('value', { fnc: () => 7 })
+      .task('double', {
+        deps: ({ data: { value } }) => value,
+        fnc: ({ deps: { data: { value } } }) => value * 2,
+      })
+
+    const consumer = component('consumer').import('shared', { hash: external })
+
+    const externalReg = asRegistration(external)
+    const consumerReg = asRegistration(consumer)
+    const imported = findNodeByName(consumerReg, 'imports', 'shared')
+
+    assert(imported, 'expected import "shared" to be registered')
+    assert.equal(imported.hash, externalReg.hash)
+  })
+
   await t.test('stores hash and codeRef for imported component', () => {
     const comp = component('consumer').import('shared', { hash: 'abc123' })
     const registration = asRegistration(comp)

@@ -1,0 +1,233 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { once } from 'node:events'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { WebSocketServer } from 'ws'
+
+import { createComponentAgent } from '../../componentAgent/index.js'
+import { diagnostics } from '../../diagnostics/diagnostics.js'
+import { component } from '../../componentBuilder/index.js'
+import { s } from '../../componentBuilder/help.js'
+import { create as createSubject } from '../../subjectFactory/create/basic.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(__dirname, '..', '..')
+const builderImportPath = pathToFileURL(path.resolve(repoRoot, 'componentBuilder', 'index.js')).href
+const tmpComponentsDir = path.join(__dirname, 'tmpComponents')
+
+const defaultMetrics = { count() { }, timing() { } }
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function createMemoryLogger() {
+  const entries = []
+  const logger = {}
+  for (const level of ['info', 'warn', 'error', 'debug']) {
+    logger[level] = (entry) => entries.push({ level, ...entry })
+  }
+  return { logger, entries }
+}
+
+async function startWebSocketServer(t) {
+  const wss = new WebSocketServer({ port: 0 })
+  const messages = []
+  const connections = new Set()
+
+  wss.on('connection', (ws) => {
+    connections.add(ws)
+    ws.on('message', (raw) => {
+      try { messages.push(JSON.parse(String(raw))) }
+      catch (error) { messages.push({ parseError: error, raw: String(raw) }) }
+    })
+    ws.on('close', () => connections.delete(ws))
+  })
+
+  await once(wss, 'listening')
+  const port = wss.address().port
+
+  t.after(async () => {
+    for (const ws of connections) {
+      try { ws.removeAllListeners() } catch { }
+      try { ws.terminate() } catch { }
+    }
+    await new Promise((resolve) => wss.close(() => resolve()))
+  })
+
+  return {
+    wss,
+    port,
+    messages,
+    broadcast(payload) {
+      const data = typeof payload === 'string' ? payload : JSON.stringify(payload)
+      for (const ws of connections) ws.send(data)
+    },
+  }
+}
+
+async function waitForMessage(messages, predicate = () => true, timeoutMs = 2000) {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const found = messages.find(predicate)
+    if (found) return found
+    await sleep(10)
+  }
+  return null
+}
+
+async function createComponentModule({
+  name,
+  fileName = `${name}.comp.js`,
+  delayMs = 0,
+  definition,
+}) {
+  await fs.mkdir(tmpComponentsDir, { recursive: true })
+  const dir = await fs.mkdtemp(path.join(tmpComponentsDir, `component-agent-${name}-`))
+  const filePath = path.join(dir, fileName)
+
+  const delayLine = delayMs > 0 ? `await new Promise((resolve) => setTimeout(resolve, ${delayMs}));\n` : ''
+  const source = [
+    `import { component } from '${builderImportPath}';`,
+    delayLine,
+    `const comp = (${definition})();`,
+    'export default comp;',
+    '',
+  ].join('\n')
+
+  await fs.writeFile(filePath, source, 'utf8')
+  const mod = await import(pathToFileURL(filePath).href)
+
+  return {
+    dir,
+    filePath,
+    component: mod.default,
+    registration: mod.default[s.INTERNALS].registration(),
+    hash: mod.default[s.INTERNALS].hash(),
+  }
+}
+
+test('component agent registers discovered components on connect', async (t) => {
+  const { logger } = createMemoryLogger()
+  const diag = diagnostics({ logger, metrics: defaultMetrics })
+
+  const componentName = 'reg-component'
+  const fixture = await createComponentModule({
+    name: componentName,
+    definition: () => component('reg-component')
+      .data('value', { fnc: () => 7 })
+      .task('double', {
+        deps: ({ data: { value } }) => value,
+        fnc: ({ deps: { data: { value } } }) => value * 2,
+      }),
+  })
+  t.after(() => fs.rm(fixture.dir, { recursive: true, force: true }))
+
+  const server = await startWebSocketServer(t)
+  const agent = createComponentAgent({
+    ipAddress: '127.0.0.1',
+    port: server.port,
+    directories: [fixture.dir],
+    diagnostics: diag,
+  })
+
+  const registrationSubject = createSubject()
+    .env('prod')
+    .ns('component-service')
+    .context('component-agent')
+    .entity('component')
+    .channel('cmd')
+    .action('register')
+    .version('v1')
+    .build()
+
+  const message = await waitForMessage(
+    server.messages,
+    (m) => m.subject === registrationSubject,
+  )
+
+  assert.ok(message, 'expected registration message from agent')
+  assert.equal(message.subject, registrationSubject)
+  assert.equal(message.data.name, fixture.registration.name)
+  assert.equal(message.data.hash, fixture.registration.hash)
+  assert.deepEqual(
+    message.data.tasks.map(({ name }) => name),
+    fixture.registration.tasks.map(({ name }) => name),
+  )
+
+  agent.removeAllListeners()
+  agent.close()
+})
+
+test('queued compute_result requests are processed once the router is ready', async (t) => {
+  const { logger } = createMemoryLogger()
+  const diag = diagnostics({ logger, metrics: defaultMetrics })
+
+  const componentName = 'compute-comp'
+  const fixture = await createComponentModule({
+    name: componentName,
+    delayMs: 50,
+    definition: () => component('compute-comp')
+      .task('add', {
+        deps: ({ deps: { inputs } }) => inputs,
+        fnc: ({ deps: { inputs } }) => inputs.a + inputs.b,
+      }),
+  })
+  t.after(() => fs.rm(fixture.dir, { recursive: true, force: true }))
+
+  const server = await startWebSocketServer(t)
+  const connectionPromise = once(server.wss, 'connection')
+
+  const agent = createComponentAgent({
+    ipAddress: '127.0.0.1',
+    port: server.port,
+    directories: [fixture.dir],
+    diagnostics: diag,
+  })
+
+  const [ws] = await connectionPromise
+
+  const computeSubject = createSubject()
+    .env('prod')
+    .ns('component-service')
+    .context('component-agent')
+    .channel('exec')
+    .entity('component')
+    .action('compute_result')
+    .version('v1')
+    .build()
+
+  const resultSubject = createSubject()
+    .env('prod')
+    .ns('component-service')
+    .context('component-agent')
+    .entity('component')
+    .channel('evt')
+    .action('result_computed')
+    .version('v1')
+    .build()
+
+  ws.send(JSON.stringify({
+    subject: computeSubject,
+    data: {
+      instanceId: 'req-1',
+      deps: { inputs: { a: 2, b: 3 } },
+      componentHash: fixture.hash,
+      name: 'add',
+      type: 'task',
+    },
+  }))
+
+  const resultMessage = await waitForMessage(
+    server.messages,
+    (m) => m.subject === resultSubject,
+  )
+
+  assert.ok(resultMessage, 'expected computed result from agent')
+  assert.equal(resultMessage.data.instanceId, 'req-1')
+  assert.equal(resultMessage.data.name, 'add')
+  assert.equal(resultMessage.data.type, 'task')
+  assert.equal(resultMessage.data.result, 5)
+
+  agent.removeAllListeners()
+  agent.close()
+})
